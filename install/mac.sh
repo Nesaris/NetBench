@@ -79,7 +79,8 @@ cat > "$PLIST" <<PL
 </dict></plist>
 PL
 launchctl bootout "$D/$LABEL" 2>/dev/null || true
-launchctl bootstrap "$D" "$PLIST"
+# le moteur peut mettre un instant à s'arrêter : on réessaie
+for i in 1 2 3 4 5 6 7 8 9 10; do launchctl bootstrap "$D" "$PLIST" 2>/dev/null && break; sleep 0.5; done
 
 # ---------------------------------------------------------------- application (fenêtre native, sans navigateur)
 if [ "$NOAPP" = 1 ]; then say "Moteur de Rebond $VER installé."; exit 0; fi
