@@ -1,12 +1,12 @@
 'use strict';
-// Mises à jour automatiques depuis les releases GitHub de Nesaris/sonde.
+// Mises à jour automatiques depuis les releases GitHub de Nesaris/netbench.
 // Chaque version est un « paquet » JSON signé (Ed25519). La signature est vérifiée avec la clé publique
 // ci-dessous avant d'écrire le moindre fichier : une version non signée par le mainteneur est refusée.
 const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 
-const REPO = process.env.SONDE_REPO || 'Nesaris/sonde';
+const REPO = process.env.SONDE_REPO || 'Nesaris/netbench';
 const PUBLIC_KEY = `-----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEAY03Xgj+jmh+tZbBD0cI+qQuVwLH+L6/0qAGwyCFflE4=
 -----END PUBLIC KEY-----`;

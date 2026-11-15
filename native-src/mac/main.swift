@@ -1,4 +1,4 @@
-// Fenêtre native de Rebond pour macOS : une vraie app (Dock, menu, ⌘Q), sans navigateur.
+// Fenêtre native de NetBench pour macOS : une vraie app (Dock, menu, ⌘Q), sans navigateur.
 // Elle démarre le moteur (agent launchd de l'utilisateur) s'il ne tourne pas, puis affiche l'interface
 // locale dans une vue WebKit du système, avec la clé d'accès de l'interface (ui.key).
 import Cocoa
@@ -27,7 +27,7 @@ var installed: Bool { FileManager.default.fileExists(atPath: (ROOT as NSString).
 // Première ouverture de l'app téléchargée : installe le moteur (Node.js vérifié + paquet signé), sans recréer d'icône
 func install() -> Bool {
   let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/bash")
-  p.arguments = ["-c", "set -o pipefail; /usr/bin/curl -fsSL https://raw.githubusercontent.com/Nesaris/sonde/main/install/mac.sh | /bin/bash -s -- --no-app"]
+  p.arguments = ["-c", "set -o pipefail; /usr/bin/curl -fsSL https://raw.githubusercontent.com/Nesaris/netbench/main/install/mac.sh | /bin/bash -s -- --no-app"]
   p.standardOutput = FileHandle.nullDevice; p.standardError = FileHandle.nullDevice
   do { try p.run() } catch { return false }
   p.waitUntilExit(); return p.terminationStatus == 0 && installed
@@ -55,18 +55,18 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDele
     web.navigationDelegate = self; web.uiDelegate = self
     web.setValue(false, forKey: "drawsBackground")
     win = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1480, height: 940), styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
-    win.title = "Rebond"; win.titlebarAppearsTransparent = true; win.appearance = NSAppearance(named: .darkAqua)
+    win.title = "NetBench"; win.titlebarAppearsTransparent = true; win.appearance = NSAppearance(named: .darkAqua)
     win.backgroundColor = NSColor(red: 0.043, green: 0.051, blue: 0.063, alpha: 1)
     win.minSize = NSSize(width: 980, height: 640)
     win.contentView = web; win.delegate = self
-    win.center(); win.setFrameAutosaveName("RebondMain")
+    win.center(); win.setFrameAutosaveName("NetBenchMain")
     win.makeKeyAndOrderFront(nil)
     NSApp.activate(ignoringOtherApps: true)
-    web.loadHTMLString(page("Rebond", "Démarrage du moteur de mesure…"), baseURL: nil)
+    web.loadHTMLString(page("NetBench", "Démarrage du moteur de mesure…"), baseURL: nil)
     DispatchQueue.global().async {
       if !installed {
-        DispatchQueue.main.async { self.web.loadHTMLString(page("Installation de Rebond", "Téléchargement de Node.js (empreinte vérifiée) et du moteur de Rebond (signature vérifiée). Une minute environ."), baseURL: nil) }
-        if !install() { DispatchQueue.main.async { self.web.loadHTMLString(page("Installation impossible", "Vérifie la connexion Internet puis rouvre Rebond."), baseURL: nil) }; return }
+        DispatchQueue.main.async { self.web.loadHTMLString(page("Installation de NetBench", "Téléchargement de Node.js (empreinte vérifiée) et du moteur de NetBench (signature vérifiée). Une minute environ."), baseURL: nil) }
+        if !install() { DispatchQueue.main.async { self.web.loadHTMLString(page("Installation impossible", "Vérifie la connexion Internet puis rouvre NetBench."), baseURL: nil) }; return }
       }
       startEngine()
       let key = (try? String(contentsOfFile: (SUP as NSString).appendingPathComponent("ui.key"), encoding: .utf8))?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -101,11 +101,11 @@ final class App: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDele
     let main = NSMenu()
     let appItem = NSMenuItem(); main.addItem(appItem)
     let am = NSMenu()
-    am.addItem(withTitle: "À propos de Rebond", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+    am.addItem(withTitle: "À propos de NetBench", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
     am.addItem(.separator())
-    am.addItem(withTitle: "Masquer Rebond", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
+    am.addItem(withTitle: "Masquer NetBench", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
     am.addItem(.separator())
-    am.addItem(withTitle: "Quitter Rebond", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+    am.addItem(withTitle: "Quitter NetBench", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
     appItem.submenu = am
     let editItem = NSMenuItem(); main.addItem(editItem)
     let em = NSMenu(title: "Édition")

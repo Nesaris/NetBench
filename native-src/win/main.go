@@ -1,4 +1,4 @@
-// Fenêtre native de Rebond pour Windows : une vraie app (barre des tâches, icône), sans navigateur.
+// Fenêtre native de NetBench pour Windows : une vraie app (barre des tâches, icône), sans navigateur.
 // Elle affiche l'interface locale dans WebView2, le moteur web du système (inclus dans Windows 10/11).
 // Première ouverture de l'exécutable téléchargé : installe le moteur (Node.js vérifié + paquet signé).
 package main
@@ -18,7 +18,7 @@ import (
 )
 
 const base = "http://127.0.0.1:47800"
-const installCmd = "& ([scriptblock]::Create((irm https://raw.githubusercontent.com/Nesaris/sonde/main/install/win.ps1))) -NoLaunch"
+const installCmd = "& ([scriptblock]::Create((irm https://raw.githubusercontent.com/Nesaris/netbench/main/install/win.ps1))) -NoLaunch"
 
 var (
 	root    = filepath.Join(os.Getenv("LOCALAPPDATA"), "Sonde", "app")
@@ -71,7 +71,7 @@ func openExternal(u string) {
 func msg(text string) {
 	user32 := syscall.NewLazyDLL("user32.dll")
 	t, _ := syscall.UTF16PtrFromString(text)
-	c, _ := syscall.UTF16PtrFromString("Rebond")
+	c, _ := syscall.UTF16PtrFromString("NetBench")
 	user32.NewProc("MessageBoxW").Call(0, uintptr(unsafe.Pointer(t)), uintptr(unsafe.Pointer(c)), 0x40)
 }
 
@@ -79,10 +79,10 @@ func main() {
 	w := webview2.NewWithOptions(webview2.WebViewOptions{
 		AutoFocus: true,
 		DataPath:  filepath.Join(os.Getenv("LOCALAPPDATA"), "Sonde", "webview"),
-		WindowOptions: webview2.WindowOptions{Title: "Rebond", Width: 1480, Height: 940, IconId: 1, Center: true},
+		WindowOptions: webview2.WindowOptions{Title: "NetBench", Width: 1480, Height: 940, IconId: 1, Center: true},
 	})
 	if w == nil {
-		msg("Rebond a besoin du composant Microsoft Edge WebView2, inclus dans Windows 11 et dans Windows 10 à jour.\n\nInstalle-le depuis https://go.microsoft.com/fwlink/p/?LinkId=2124703 puis rouvre Rebond.")
+		msg("NetBench a besoin du composant Microsoft Edge WebView2, inclus dans Windows 11 et dans Windows 10 à jour.\n\nInstalle-le depuis https://go.microsoft.com/fwlink/p/?LinkId=2124703 puis rouvre NetBench.")
 		openExternal("https://go.microsoft.com/fwlink/p/?LinkId=2124703")
 		return
 	}
@@ -93,14 +93,14 @@ func main() {
 	w.Init(`(()=>{const ext=u=>{try{const x=new URL(u,location.href);if(x.origin!=="` + base + `")return __rebondOpen(x.href),true}catch(e){}return false};
 document.addEventListener('click',e=>{const a=e.target.closest&&e.target.closest('a[href]');if(a&&ext(a.href))e.preventDefault()},true);
 window.open=u=>{ext(String(u));return null};window.close=()=>__rebondQuit();})()`)
-	w.SetHtml(page("Rebond", "Démarrage du moteur de mesure…"))
+	w.SetHtml(page("NetBench", "Démarrage du moteur de mesure…"))
 	go func() {
 		if !installed() {
 			w.Dispatch(func() {
-				w.SetHtml(page("Installation de Rebond", "Téléchargement de Node.js (empreinte vérifiée) et du moteur de Rebond (signature vérifiée). Une minute environ."))
+				w.SetHtml(page("Installation de NetBench", "Téléchargement de Node.js (empreinte vérifiée) et du moteur de NetBench (signature vérifiée). Une minute environ."))
 			})
 			if !install() {
-				w.Dispatch(func() { w.SetHtml(page("Installation impossible", "Vérifie la connexion Internet puis rouvre Rebond.")) })
+				w.Dispatch(func() { w.SetHtml(page("Installation impossible", "Vérifie la connexion Internet puis rouvre NetBench.")) })
 				return
 			}
 		}

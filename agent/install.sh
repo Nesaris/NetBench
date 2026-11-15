@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # Installe ou met à jour Sonde Agent (DNS local qui montre quels services utilise chaque appareil).
-#   curl -fsSL https://raw.githubusercontent.com/Nesaris/sonde/main/agent/install.sh | sudo bash              # service systemd
-#   curl -fsSL https://raw.githubusercontent.com/Nesaris/sonde/main/agent/install.sh | sudo bash -s -- --docker
+#   curl -fsSL https://raw.githubusercontent.com/Nesaris/netbench/main/agent/install.sh | sudo bash              # service systemd
+#   curl -fsSL https://raw.githubusercontent.com/Nesaris/netbench/main/agent/install.sh | sudo bash -s -- --docker
 # Options : --docker | --systemd | --update | --uninstall
 # Chaque version est vérifiée avec la signature Ed25519 du mainteneur avant installation.
 set -euo pipefail
 
-REPO="${SONDE_REPO:-Nesaris/sonde}"
+REPO="${SONDE_REPO:-Nesaris/netbench}"
 DIR=/opt/sonde-agent
 DATA=/var/lib/sonde-agent
 PUBKEY='MCowBQYDK2VwAyEAY03Xgj+jmh+tZbBD0cI+qQuVwLH+L6/0qAGwyCFflE4='

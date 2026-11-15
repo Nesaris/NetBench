@@ -1,4 +1,4 @@
-# Rebond
+# NetBench
 
 <img src="assets/icon.svg" width="96" alt="">
 
@@ -12,28 +12,28 @@
 
 ### Télécharger l'app
 
-Dans la [dernière release](https://github.com/Nesaris/sonde/releases/latest) :
+Dans la [dernière release](https://github.com/Nesaris/netbench/releases/latest) :
 
-- **Mac** (macOS 11 ou plus récent, Apple Silicon et Intel) : `Rebond-mac.zip`. Décompresse, glisse **Rebond** dans Applications et ouvre-la. L'app n'est pas signée par un compte développeur Apple : la première fois, fais clic droit → **Ouvrir** (ou Réglages Système → Confidentialité et sécurité → **Ouvrir quand même**).
-- **Windows 10 / 11** : `Rebond.exe`. Windows SmartScreen peut afficher « Windows a protégé votre ordinateur » : **Informations complémentaires → Exécuter quand même**.
+- **Mac** (macOS 11 ou plus récent, Apple Silicon et Intel) : `NetBench-mac.zip`. Décompresse, glisse **NetBench** dans Applications et ouvre-la. L'app n'est pas signée par un compte développeur Apple : la première fois, fais clic droit → **Ouvrir** (ou Réglages Système → Confidentialité et sécurité → **Ouvrir quand même**).
+- **Windows 10 / 11** : `NetBench.exe`. Windows SmartScreen peut afficher « Windows a protégé votre ordinateur » : **Informations complémentaires → Exécuter quand même**.
 
-Au premier lancement, l'app installe son moteur toute seule (Node.js vérifié par empreinte SHA-256, moteur vérifié par signature Ed25519). Rebond est une vraie app avec sa propre fenêtre : elle n'utilise aucun navigateur, seulement le moteur web intégré au système (WebKit sur Mac, WebView2 sur Windows).
+Au premier lancement, l'app installe son moteur toute seule (Node.js vérifié par empreinte SHA-256, moteur vérifié par signature Ed25519). NetBench est une vraie app avec sa propre fenêtre : elle n'utilise aucun navigateur, seulement le moteur web intégré au système (WebKit sur Mac, WebView2 sur Windows).
 
 ### Ou en une ligne de commande
 
 **Mac** (macOS 11 ou plus récent) — dans le Terminal :
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Nesaris/sonde/main/install/mac.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Nesaris/netbench/main/install/mac.sh | bash
 ```
 
 **Windows 10 / 11** — dans PowerShell :
 
 ```powershell
-irm https://raw.githubusercontent.com/Nesaris/sonde/main/install/win.ps1 | iex
+irm https://raw.githubusercontent.com/Nesaris/netbench/main/install/win.ps1 | iex
 ```
 
-Au premier lancement, Rebond cherche ta box tout seul, te demande si c'est bien elle, puis s'y connecte :
+Au premier lancement, NetBench cherche ta box tout seul, te demande si c'est bien elle, puis s'y connecte :
 
 | Opérateur | Box | Connexion | Prise en charge |
 |---|---|---|---|
@@ -62,37 +62,37 @@ Le ping, les tests de débit, la surveillance des pics et les rapports marchent 
 
 L'onglet **Services** montre en direct chaque site ou service consulté (Netflix, YouTube, jeux…) avec son logo, qui l'utilise, et permet de bloquer un site ou un service, de recevoir des alertes Discord ou Telegram, et de donner la priorité à un appareil. Il faut pour ça un petit serveur DNS local, l'agent. Trois façons de l'installer :
 
-- **Sur l'ordinateur** : bouton « Activer sur cet ordinateur » dans l'onglet Services. Actif seulement quand Rebond est ouvert. Sur chaque appareil à surveiller : DNS 1 = l'ordinateur, DNS 2 = la box.
+- **Sur l'ordinateur** : bouton « Activer sur cet ordinateur » dans l'onglet Services. Actif seulement quand NetBench est ouvert. Sur chaque appareil à surveiller : DNS 1 = l'ordinateur, DNS 2 = la box.
 - **Docker** (NAS, serveur, Raspberry Pi) :
   ```bash
-  curl -fsSL https://raw.githubusercontent.com/Nesaris/sonde/main/agent/install.sh | sudo bash -s -- --docker
+  curl -fsSL https://raw.githubusercontent.com/Nesaris/netbench/main/agent/install.sh | sudo bash -s -- --docker
   ```
 - **Debian / Ubuntu Server** (ou VM Debian sur une Freebox), en service systemd :
   ```bash
-  curl -fsSL https://raw.githubusercontent.com/Nesaris/sonde/main/agent/install.sh | sudo bash
+  curl -fsSL https://raw.githubusercontent.com/Nesaris/netbench/main/agent/install.sh | sudo bash
   ```
 
 L'agent ne lit que les **noms de domaine** demandés (pas les pages ni le contenu, qui sont chiffrés). Ses données restent sur ta machine. Un appareil qui utilise son propre DNS chiffré (navigateur avec « DNS sécurisé », VPN, Relais privé iCloud) ou le DNS IPv6 de la box n'apparaît pas.
 
 ## Sécurité et vie privée
 
-- **Tout reste chez toi.** Rebond écoute seulement sur `127.0.0.1` ; l'agent répond seulement au réseau local. Aucune télémétrie.
+- **Tout reste chez toi.** NetBench écoute seulement sur `127.0.0.1` ; l'agent répond seulement au réseau local. Aucune télémétrie.
 - **Mots de passe de box** gardés dans le coffre du système : trousseau d'accès sur Mac, chiffrement DPAPI du compte sur Windows.
 - **Agent** : API HTTPS en TLS 1.3 (certificat épinglé, empreinte affichée), compte créé avec un code d'installation à usage unique, mots de passe hachés (scrypt), blocage après 5 essais ratés, sessions révocables.
 - **Interface** : accessible seulement à la fenêtre ouverte par l'icône (clé d'accès locale), politique de sécurité du contenu stricte, aucune ressource chargée depuis Internet (polices et pictogrammes inclus).
-- **Mises à jour signées** : chaque version est signée (Ed25519) par le mainteneur. Rebond, les installeurs et l'agent vérifient la signature avant d'installer quoi que ce soit ; une version modifiée par quelqu'un d'autre est refusée. Node.js est téléchargé depuis nodejs.org et son empreinte SHA-256 est vérifiée.
-- **Retour arrière automatique** : si une nouvelle version plante au démarrage, Rebond revient à la précédente.
+- **Mises à jour signées** : chaque version est signée (Ed25519) par le mainteneur. NetBench, les installeurs et l'agent vérifient la signature avant d'installer quoi que ce soit ; une version modifiée par quelqu'un d'autre est refusée. Node.js est téléchargé depuis nodejs.org et son empreinte SHA-256 est vérifiée.
+- **Retour arrière automatique** : si une nouvelle version plante au démarrage, NetBench revient à la précédente.
 
 Détails et signalement d'une faille : [SECURITY.md](SECURITY.md).
 
 ## Mises à jour
 
-Rebond vérifie les nouvelles versions au démarrage puis toutes les 6 heures, et les installe toute seule quand aucun test n'est en cours (désactivable dans Réglages → Mises à jour). L'agent installé par script se met à jour chaque jour (minuteur systemd ou reconstruction Docker).
+NetBench vérifie les nouvelles versions au démarrage puis toutes les 6 heures, et les installe toute seule quand aucun test n'est en cours (désactivable dans Réglages → Mises à jour). L'agent installé par script se met à jour chaque jour (minuteur systemd ou reconstruction Docker).
 
 ## Désinstaller
 
-- Mac : `curl -fsSL https://raw.githubusercontent.com/Nesaris/sonde/main/install/mac.sh | bash -s -- --uninstall`
-- Windows : `& ([scriptblock]::Create((irm https://raw.githubusercontent.com/Nesaris/sonde/main/install/win.ps1))) -Uninstall`
+- Mac : `curl -fsSL https://raw.githubusercontent.com/Nesaris/netbench/main/install/mac.sh | bash -s -- --uninstall`
+- Windows : `& ([scriptblock]::Create((irm https://raw.githubusercontent.com/Nesaris/netbench/main/install/win.ps1))) -Uninstall`
 - Agent : `sudo /opt/sonde-agent/install.sh --uninstall`
 
 ## Développement

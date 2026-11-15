@@ -1,18 +1,18 @@
 #!/bin/bash
-# Installe Rebond (anciennement Sonde) sur Mac (ou le met à jour, ou le désinstalle avec --uninstall).
-#   curl -fsSL https://raw.githubusercontent.com/Nesaris/sonde/main/install/mac.sh | bash
+# Installe NetBench (anciennement Sonde) sur Mac (ou le met à jour, ou le désinstalle avec --uninstall).
+#   curl -fsSL https://raw.githubusercontent.com/Nesaris/netbench/main/install/mac.sh | bash
 # Rien n'est installé en dehors de ton dossier utilisateur, aucun mot de passe administrateur n'est demandé.
 # Node.js est téléchargé depuis nodejs.org (empreinte SHA-256 vérifiée) et Sonde depuis les releases GitHub
 # (signature Ed25519 du mainteneur vérifiée avant installation).
 set -euo pipefail
 
-REPO="${SONDE_REPO:-Nesaris/sonde}"
+REPO="${SONDE_REPO:-Nesaris/netbench}"
 PUBKEY='MCowBQYDK2VwAyEAY03Xgj+jmh+tZbBD0cI+qQuVwLH+L6/0qAGwyCFflE4='
 LABEL=fr.nesaris.sonde
 SUP="$HOME/Library/Application Support/Sonde"
 ROOT="$SUP/app"
-APP="$HOME/Applications/Rebond.app"
-OLDAPPS=("$HOME/Applications/Sonde.app" "$HOME/Applications/Pouls.app")
+APP="$HOME/Applications/NetBench.app"
+OLDAPPS=("$HOME/Applications/Sonde.app" "$HOME/Applications/Pouls.app" "$HOME/Applications/Rebond.app")
 NOAPP=0; [ "${1:-}" = "--no-app" ] && NOAPP=1
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 D="gui/$(id -u)"
@@ -24,7 +24,7 @@ die() { printf '\033[1;31m✗\033[0m %s\n' "$*" >&2; exit 1; }
 if [ "${1:-}" = "--uninstall" ]; then
   launchctl bootout "$D/$LABEL" 2>/dev/null || true
   rm -rf "$APP" "${OLDAPPS[@]}" "$PLIST" "$ROOT"
-  say "Rebond est désinstallé. Tes rapports et réglages restent dans « $SUP » : supprime ce dossier pour tout effacer."
+  say "NetBench est désinstallé. Tes rapports et réglages restent dans « $SUP » : supprime ce dossier pour tout effacer."
   exit 0
 fi
 
@@ -46,8 +46,8 @@ if [ "$(cat "$ROOT/node/.file" 2>/dev/null)" != "$FILE" ]; then
 fi
 NODE="$ROOT/node/bin/node"
 
-# ---------------------------------------------------------------- moteur de Rebond (paquet signé)
-say "Téléchargement de la dernière version de Rebond"
+# ---------------------------------------------------------------- moteur de NetBench (paquet signé)
+say "Téléchargement de la dernière version de NetBench"
 curl -fsSL -H 'accept: application/vnd.github+json' "https://api.github.com/repos/$REPO/releases/latest" -o "$TMP/rel.json"
 VER="$("$NODE" -p 'JSON.parse(require("fs").readFileSync(process.argv[1])).tag_name.replace(/^v/,"")' "$TMP/rel.json")"
 URL="https://github.com/$REPO/releases/download/v$VER/sonde-app-$VER.json"
@@ -83,15 +83,15 @@ launchctl bootout "$D/$LABEL" 2>/dev/null || true
 for i in 1 2 3 4 5 6 7 8 9 10; do launchctl bootstrap "$D" "$PLIST" 2>/dev/null && break; sleep 0.5; done
 
 # ---------------------------------------------------------------- application (fenêtre native, sans navigateur)
-if [ "$NOAPP" = 1 ]; then say "Moteur de Rebond $VER installé."; exit 0; fi
+if [ "$NOAPP" = 1 ]; then say "Moteur de NetBench $VER installé."; exit 0; fi
 rm -rf "$APP" "${OLDAPPS[@]}"
-# Rebond.app native (vérifiée avec la même signature Ed25519) ; sinon, lanceur de secours
-NURL="https://github.com/$REPO/releases/download/v$VER/Rebond-mac.zip"
-if curl -fsSL "$NURL" -o "$TMP/Rebond-mac.zip" && curl -fsSL "$NURL.sig" -o "$TMP/Rebond-mac.zip.sig" && PUB="$PUBKEY" "$NODE" -e '
+# NetBench.app native (vérifiée avec la même signature Ed25519) ; sinon, lanceur de secours
+NURL="https://github.com/$REPO/releases/download/v$VER/NetBench-mac.zip"
+if curl -fsSL "$NURL" -o "$TMP/NetBench-mac.zip" && curl -fsSL "$NURL.sig" -o "$TMP/NetBench-mac.zip.sig" && PUB="$PUBKEY" "$NODE" -e '
   const c=require("crypto"),fs=require("fs");
   const pub="-----BEGIN PUBLIC KEY-----\n"+process.env.PUB+"\n-----END PUBLIC KEY-----";
-  process.exit(c.verify(null,fs.readFileSync(process.argv[1]),c.createPublicKey(pub),Buffer.from(fs.readFileSync(process.argv[2],"utf8").trim(),"base64"))?0:1)' "$TMP/Rebond-mac.zip" "$TMP/Rebond-mac.zip.sig"; then
-  ditto -x -k "$TMP/Rebond-mac.zip" "$HOME/Applications"
+  process.exit(c.verify(null,fs.readFileSync(process.argv[1]),c.createPublicKey(pub),Buffer.from(fs.readFileSync(process.argv[2],"utf8").trim(),"base64"))?0:1)' "$TMP/NetBench-mac.zip" "$TMP/NetBench-mac.zip.sig"; then
+  ditto -x -k "$TMP/NetBench-mac.zip" "$HOME/Applications"
   xattr -dr com.apple.quarantine "$APP" 2>/dev/null || true
   say "App native vérifiée (signature)"
 else
@@ -100,18 +100,18 @@ else
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-<key>CFBundleName</key><string>Rebond</string><key>CFBundleDisplayName</key><string>Rebond</string>
-<key>CFBundleIdentifier</key><string>fr.nesaris.rebond</string><key>CFBundleExecutable</key><string>Rebond</string>
+<key>CFBundleName</key><string>NetBench</string><key>CFBundleDisplayName</key><string>NetBench</string>
+<key>CFBundleIdentifier</key><string>fr.nesaris.netbench</string><key>CFBundleExecutable</key><string>NetBench</string>
 <key>CFBundleIconFile</key><string>icon</string><key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>$VER</string><key>LSMinimumSystemVersion</key><string>11.0</string>
 </dict></plist>
 PL
   [ -f "$ROOT/versions/$VER/assets/icon.icns" ] && cp "$ROOT/versions/$VER/assets/icon.icns" "$APP/Contents/Resources/icon.icns"
-  "$NODE" -e 'process.stdout.write(require(process.argv[1]).mac())' "$ROOT/versions/$VER/lib/launchers.js" > "$APP/Contents/MacOS/Rebond"
-  chmod 755 "$APP/Contents/MacOS/Rebond"
+  "$NODE" -e 'process.stdout.write(require(process.argv[1]).mac())' "$ROOT/versions/$VER/lib/launchers.js" > "$APP/Contents/MacOS/NetBench"
+  chmod 755 "$APP/Contents/MacOS/NetBench"
 fi
 
 touch "$APP"; /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP" 2>/dev/null || true
-say "Rebond $VER est installé : ~/Applications/Rebond.app"
+say "NetBench $VER est installé : ~/Applications/NetBench.app"
 say "Les mises à jour suivantes s'installent toutes seules (Réglages → Mises à jour)."
 open "$APP"

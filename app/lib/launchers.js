@@ -1,5 +1,5 @@
 'use strict';
-// Lanceurs de la fenêtre Rebond (icône Mac, raccourci Windows). Ils sont réécrits à chaque démarrage de l'app :
+// Lanceurs de la fenêtre NetBench (icône Mac, raccourci Windows). Ils sont réécrits à chaque démarrage de l'app :
 // une mise à jour peut ainsi les corriger. La fenêtre s'ouvre avec la clé d'accès de l'interface (ui.key).
 const fs = require('node:fs');
 const os = require('node:os');
@@ -7,7 +7,7 @@ const path = require('node:path');
 
 function mac() {
   return `#!/bin/bash
-# Démarre le moteur s'il ne tourne pas, puis ouvre la fenêtre de Rebond avec sa clé d'accès.
+# Démarre le moteur s'il ne tourne pas, puis ouvre la fenêtre de NetBench avec sa clé d'accès.
 URL=http://127.0.0.1:47800
 LABEL=fr.nesaris.sonde
 SUP="$HOME/Library/Application Support/Sonde"
@@ -25,7 +25,7 @@ open "$URL/?k=$K"
 `;
 }
 function win(root, node, dataDir) {
-  return `' Démarre le moteur de Rebond s'il ne tourne pas, puis ouvre la fenêtre avec sa clé d'accès.
+  return `' Démarre le moteur de NetBench s'il ne tourne pas, puis ouvre la fenêtre avec sa clé d'accès.
 Set sh = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 Function Up()
@@ -56,11 +56,11 @@ function write(file, content, mode) {
 }
 function refresh({ root, node, dataDir, log }) {
   if (process.platform === 'darwin') {
-    // Rebond.app (ancien nom : Sonde.app, gardé tant que l'installeur n'est pas repassé)
+    // NetBench.app (ancien nom : Sonde.app, gardé tant que l'installeur n'est pas repassé)
     // Seuls les anciens lanceurs en script sont réécrits ; l'app native (binaire) n'est jamais touchée
-    for (const [a, e] of [['Rebond.app', 'Rebond'], ['Pouls.app', 'Pouls'], ['Sonde.app', 'Sonde']]) { const f = path.join(os.homedir(), 'Applications', a, 'Contents', 'MacOS', e); let h = ''; try { h = fs.readFileSync(f).subarray(0, 2).toString(); } catch { } if (h === '#!' && write(f, mac(), 0o755)) log('lanceur Mac mis à jour'); }
+    for (const [a, e] of [['NetBench.app', 'NetBench'], ['Pouls.app', 'Pouls'], ['Sonde.app', 'Sonde']]) { const f = path.join(os.homedir(), 'Applications', a, 'Contents', 'MacOS', e); let h = ''; try { h = fs.readFileSync(f).subarray(0, 2).toString(); } catch { } if (h === '#!' && write(f, mac(), 0o755)) log('lanceur Mac mis à jour'); }
   } else if (process.platform === 'win32') {
-    const f = [path.join(root, 'Rebond.vbs'), path.join(root, 'Sonde.vbs')].find(x => fs.existsSync(x));
+    const f = [path.join(root, 'NetBench.vbs'), path.join(root, 'Sonde.vbs')].find(x => fs.existsSync(x));
     if (f) { const c = win(root, node, dataDir); try { if (fs.readFileSync(f, 'utf16le').replace(/^﻿/, '') !== c) { fs.writeFileSync(f, '﻿' + c, 'utf16le'); log('lanceur Windows mis à jour'); } } catch { } }
   }
 }
