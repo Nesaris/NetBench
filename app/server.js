@@ -14,6 +14,8 @@ const updater = require('./lib/updater');
 
 const VERSION = (() => { try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'version.json'), 'utf8')).version; } catch { return '0.0.0'; } })();
 const PORT = +process.env.SONDE_PORT || 47800;
+// Mode serveur : lancé par l'agent (VM de la box, Docker, Debian/Ubuntu), mesure en continu sans fenêtre ouverte
+const HEADLESS = !!process.env.SONDE_HEADLESS;
 const HOST = '127.0.0.1';
 const DATA_DIR = platform.dataDir;
 const HIST_FILE = path.join(DATA_DIR, 'history.json');
@@ -27,6 +29,8 @@ function log(...a) { console.log(new Date().toISOString().slice(11, 19), ...a); 
 // ---------------------------------------------------------------- SSE
 const clients = new Set();
 let lastClientSeen = now();
+let proxied = 0; // fenêtres ouvertes dont le flux passe par l'agent (mode « mesures par l'agent »)
+const active = () => HEADLESS || clients.size > 0;
 function broadcast(ev, data) {
   const msg = `event: ${ev}\ndata: ${JSON.stringify(data)}\n\n`;
   for (const c of clients) c.write(msg);
@@ -233,7 +237,7 @@ async function pollWan() {
     const c = await box.wan();
     wan.down = c.down; wan.up = c.up; wan.t = now();
     wan.state = c.state; wan.bwDown = c.bwDown; wan.bwUp = c.bwUp;
-    wan.hist.push({ t: wan.t, down: wan.down, up: wan.up }); if (wan.hist.length > 600) wan.hist.shift();
+    wan.hist.push({ t: wan.t, down: wan.down, up: wan.up }); if (wan.hist.length > 21600) wan.hist.shift();
     broadcast('wan', { t: wan.t, down: wan.down, up: wan.up, state: wan.state, bwDown: wan.bwDown, bwUp: wan.bwUp });
   } catch (e) { broadcast('wanError', { message: e.message, code: e.code }); }
   finally { wanBusy = false; }
@@ -269,8 +273,8 @@ async function checkNewDevices(list) {
 }
 // Wi-Fi du Mac poussé toutes les 5 s
 setInterval(async () => { if (clients.size) broadcast('mac', await getMacWifi()); }, 4000);
-setInterval(() => { if (clients.size || (load && load.running)) pollWan(); }, 500);
-setInterval(() => { if (clients.size) pollDevices(); }, 1000);
+setInterval(() => { if (active() || (load && load.running)) pollWan(); }, HEADLESS ? 1000 : 500);
+setInterval(() => { if (active()) pollDevices(); }, HEADLESS ? 2000 : 1000);
 
 // ---------------------------------------------------------------- surveillance continue (tant que l'app est ouverte)
 // Ping permanent des consoles + box + Internet, agrégé chaque seconde, avec journal des pics.
@@ -315,7 +319,7 @@ setInterval(() => {
 }, 200);
 function watchStopAll() { for (const [, w] of watch.procs) { try { w.proc.kill(); } catch { } } watch.procs.clear(); }
 function syncWatchTargets() {
-  if (!clients.size) return watchStopAll();
+  if (!active()) return watchStopAll();
   if (!box) return watchStopAll();
   const want = new Map([['ref', { ip: GW(), name: `Box (référence ${platform.label})` }], ['inet', { ip: '1.1.1.1', name: 'Internet · 1.1.1.1' }]]);
   for (const d of devCache) if (d.ip) want.set(d.id, { ip: d.ip, name: d.name, meta: { console: d.isConsole, via: d.via, band: d.band, signal: d.signal, linkTx: d.linkTx } });
@@ -323,9 +327,50 @@ function syncWatchTargets() {
   for (const k of [...watch.procs.keys()]) if (!want.has(k)) { try { watch.procs.get(k).proc.kill(); } catch { } watch.procs.delete(k); }
 }
 setInterval(syncWatchTargets, 3000);
-function journalAppend(row) {
-  const f = path.join(JOUR_DIR, new Date(row.t).toISOString().slice(0, 10) + '.jsonl');
-  fs.appendFile(f, JSON.stringify(row) + '\n', () => { });
+// Journal seconde par seconde (débit de la box + ping des consoles), écrit par paquets toutes les 10 s
+// pour ménager le disque, et limité en taille : les jours les plus anciens partent en premier.
+const JOURNAL_MAX = (+process.env.SONDE_JOURNAL_MB || 1500) * 1e6;
+let jbuf = [];
+function journalAppend(row) { jbuf.push(row); }
+function flushJournal() {
+  if (!jbuf.length) return; const rows = jbuf; jbuf = [];
+  const by = {}; for (const r of rows) (by[new Date(r.t).toISOString().slice(0, 10)] ||= []).push(JSON.stringify(r));
+  for (const [d, ls] of Object.entries(by)) fs.appendFile(path.join(JOUR_DIR, d + '.jsonl'), ls.join('\n') + '\n', () => { });
+}
+setInterval(flushJournal, 10000);
+function pruneJournal() {
+  try {
+    const fl = fs.readdirSync(JOUR_DIR).filter(f => /^\d{4}-\d\d-\d\d\.jsonl$/.test(f)).sort().map(f => ({ f, size: fs.statSync(path.join(JOUR_DIR, f)).size }));
+    let tot = fl.reduce((a, x) => a + x.size, 0);
+    const old = new Date(now() - 90 * 86400e3).toISOString().slice(0, 10);
+    for (const x of fl.slice(0, -1)) { if (tot <= JOURNAL_MAX && x.f.slice(0, 10) >= old) break; fs.rmSync(path.join(JOUR_DIR, x.f), { force: true }); tot -= x.size; }
+  } catch { }
+}
+setInterval(pruneJournal, 3600e3); setTimeout(pruneJournal, 60e3);
+// Historique pour les graphiques : jusqu'à 600 points, en gardant le pire de chaque tranche (les pics restent visibles)
+async function liveHistory(rangeS) {
+  const since = now() - rangeS * 1000;
+  let rows = watch.rows.filter(r => r.t >= since);
+  if (!rows.length || rows[0].t > since + 60e3) {
+    const days = new Set(); for (let t = since; t <= now() + 86400e3; t += 86400e3) days.add(new Date(t).toISOString().slice(0, 10));
+    const fromFiles = [];
+    for (const d of [...days].sort()) { try { for (const l of fs.readFileSync(path.join(JOUR_DIR, d + '.jsonl'), 'utf8').split('\n')) { if (!l) continue; try { const r = JSON.parse(l); if (r.t >= since) fromFiles.push(r); } catch { } } } catch { } }
+    const first = rows.length ? rows[0].t : Infinity;
+    rows = fromFiles.filter(r => r.t < first).concat(rows);
+  }
+  const N = 600, span = rangeS * 1000 / N, wanB = new Map(), pB = {};
+  for (const r of rows) {
+    const b = Math.floor((r.t - since) / span), t = Math.round(since + (b + 1) * span);
+    const w = wanB.get(b) || [t, null, null];
+    if (r.wan?.d != null) w[1] = Math.max(w[1] ?? 0, r.wan.d); if (r.wan?.u != null) w[2] = Math.max(w[2] ?? 0, r.wan.u);
+    wanB.set(b, w);
+    for (const [name, x] of Object.entries(r.p || {})) {
+      const m = (pB[name] ||= new Map()); const o = m.get(b) || { t, max: null, lost: 0, n: 0 };
+      if (x.max != null) o.max = Math.max(o.max ?? 0, x.max); o.lost += x.lost || 0; o.n += x.n || 0; m.set(b, o);
+    }
+  }
+  const pings = {}; for (const [name, m] of Object.entries(pB)) pings[name] = [...m.values()].map(o => [o.t, o.max == null && o.lost ? null : o.max]);
+  return { since, rangeS, wan: [...wanB.values()], pings, oldest: rows[0]?.t || null };
 }
 setInterval(() => {
   if (!watch.procs.size) return;
@@ -354,7 +399,7 @@ setInterval(() => {
     const e = watch.open.get(k);
     if (e && t - e.last >= 5000) { watch.open.delete(k); delete e.last; e.cause = eventCause(e); watch.events.unshift(e); watch.events = watch.events.slice(0, 500); fs.writeFile(EVT_FILE, JSON.stringify(watch.events), () => { }); broadcast('wevent', e); }
   }
-  watch.rows.push(row); if (watch.rows.length > 7200) watch.rows.shift();
+  watch.rows.push(row); if (watch.rows.length > 21600) watch.rows.shift();
   journalAppend(row);
   broadcast('wrow', row);
 }, 1000);
@@ -629,13 +674,47 @@ function body(req) {
 }
 const okHost = h => h === `127.0.0.1:${PORT}` || h === `localhost:${PORT}`;
 
-const server = http.createServer(async (req, res) => {
-  // Protection contre le DNS rebinding / appels d'autres sites
-  if (!okHost(req.headers.host)) { res.writeHead(403); return res.end(); }
-  if (req.method !== 'GET' && req.headers.origin && !okHost((req.headers.origin || '').replace(/^https?:\/\//, ''))) { res.writeHead(403); return res.end(); }
+// ---------------------------------------------------------------- mode « mesures par l'agent »
+// L'app ne mesure plus rien elle-même : toutes les routes du moteur sont relayées vers l'agent (HTTPS, certificat épinglé).
+const LOCAL_ONLY = /^\/api\/(update|agent\/|mode$|quit$|logo$)/;
+const remoteOn = () => { if (HEADLESS || !settings.remote) return false; const c = agentCfg(); return !!(c.url && c.token && !c.local); };
+function proxyToAgent(req, res, p, search) {
+  const c = agentCfg();
+  const u = new URL('/api/engine/' + p.slice(5) + search, c.url);
+  let seenFp = null;
+  const sse = p === '/api/stream';
+  const up = https.request(u, {
+    method: req.method, rejectUnauthorized: false, agent: agentHttpsAgent, timeout: sse ? 0 : 60000,
+    checkServerIdentity: (h, cert) => { seenFp = cert && cert.fingerprint256; if (c.fp && seenFp !== c.fp) return new Error('Certificat de l\'agent différent de celui mémorisé'); },
+    headers: { authorization: 'Bearer ' + c.token, 'content-type': req.headers['content-type'] || 'application/json', ...(req.headers['content-length'] ? { 'content-length': req.headers['content-length'] } : {}) }
+  }, ur => {
+    const fp = seenFp || ur.socket.getPeerCertificate()?.fingerprint256;
+    if (c.fp && fp !== c.fp) { ur.resume(); return send(res, 495, { error: 'Certificat de l\'agent différent de celui mémorisé : connexion refusée.' }); }
+    if (ur.statusCode === 401) { const { token, ...rest } = c; saveAgent(rest); }
+    if (sse) { proxied++; lastClientSeen = now(); res.on('close', () => { proxied--; lastClientSeen = now(); up.destroy(); }); }
+    res.writeHead(ur.statusCode, { 'content-type': ur.headers['content-type'] || 'application/json', 'cache-control': 'no-store', ...(sse ? { connection: 'keep-alive' } : {}) });
+    ur.pipe(res);
+  });
+  up.on('timeout', () => up.destroy(new Error('délai dépassé')));
+  up.on('error', e => { if (!res.headersSent) send(res, 502, { error: 'Agent injoignable : ' + e.message, remoteDown: true }); else try { res.end(); } catch { } });
+  req.pipe(up);
+}
+
+async function handler(req, res, opts = {}) {
   const url = new URL(req.url, 'http://x');
   const p = url.pathname;
+  if (!opts.embedded) {
+    // Protection contre le DNS rebinding / appels d'autres sites
+    if (!okHost(req.headers.host)) { res.writeHead(403); return res.end(); }
+    if (req.method !== 'GET' && req.headers.origin && !okHost((req.headers.origin || '').replace(/^https?:\/\//, ''))) { res.writeHead(403); return res.end(); }
+    if (p.startsWith('/api/') && !LOCAL_ONLY.test(p) && remoteOn()) return proxyToAgent(req, res, p, url.search);
+  } else if (/^\/api\/(agent\/|update|mode$)/.test(p)) return send(res, 404, { error: 'introuvable' });
   try {
+    if (p === '/api/mode') {
+      if (req.method === 'POST') { const b = await body(req); settings.remote = !!b.remote; fs.writeFileSync(SET_FILE, JSON.stringify(settings)); if (settings.remote) { stopAllPings(); watchStopAll(); } }
+      const c = agentCfg(); return send(res, 200, { remote: !!settings.remote, active: remoteOn(), agent: c.url || null, headless: HEADLESS });
+    }
+    if (p === '/api/history/live') return send(res, 200, await liveHistory(Math.max(60, Math.min(7 * 86400, +url.searchParams.get('range') || 180))));
     if (p === '/' && req.method === 'GET') {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
       return fs.createReadStream(INDEX).pipe(res);
@@ -644,7 +723,7 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' });
       res.write('retry: 1500\n\n');
       clients.add(res); lastClientSeen = now();
-      if (wan.hist.length) res.write(`event: wanHist\ndata: ${JSON.stringify(wan.hist.slice(-180))}\n\n`);
+      if (wan.hist.length) res.write(`event: wanHist\ndata: ${JSON.stringify(wan.hist.slice(-200))}\n\n`);
       const ka = setInterval(() => res.write(': ka\n\n'), 15000);
       req.on('close', () => { clearInterval(ka); clients.delete(res); lastClientSeen = now(); });
       pollWan(); pollDevices();
@@ -748,7 +827,7 @@ const server = http.createServer(async (req, res) => {
       const c = agentCfg();
       if (sub === '/status') {
         if (!c.url) return send(res, 200, { configured: false, box: box?.id || null, localPossible: true });
-        try { const h = await agentReq('GET', '/api/health', null, { noAuth: true }); let logged = false; if (c.token) { const t = await agentReq('GET', '/api/fbx/status'); logged = t.status === 200; } return send(res, 200, { configured: true, url: c.url, local: !!c.local, reachable: true, setup: h.body.setup, version: h.body.version, fbx: h.body.fbx, freebox: h.body.freebox, dns: h.body.dns, logged, user: c.user || null }); }
+        try { const h = await agentReq('GET', '/api/health', null, { noAuth: true }); let logged = false; if (c.token) { const t = await agentReq('GET', '/api/fbx/status'); logged = t.status === 200; } return send(res, 200, { configured: true, url: c.url, local: !!c.local, reachable: true, setup: h.body.setup, version: h.body.version, fbx: h.body.fbx, freebox: h.body.freebox, dns: h.body.dns, engine: !!h.body.engine, logged, user: c.user || null }); }
         catch (e) { return send(res, 200, { configured: true, url: c.url, local: !!c.local, reachable: false, error: e.message }); }
       }
       if (sub === '/connect' && req.method === 'POST') {
@@ -863,25 +942,32 @@ const server = http.createServer(async (req, res) => {
     if (p === '/api/scan' && req.method === 'POST') return send(res, 200, await runScan());
     if (p === '/api/scans') return send(res, 200, readScans().map((x, i) => ({ i, date: x.date, n: x.devices.length, added: x.added.length, removed: x.removed.length, changes: x.changes.length, alerts: x.alerts.length })));
     if (p.startsWith('/api/scans/')) { const x = readScans()[+p.split('/').pop()]; return x ? send(res, 200, x) : send(res, 404, { error: 'introuvable' }); }
-    if (p === '/api/quit' && req.method === 'POST') { send(res, 200, { ok: true }); return shutdown(0); }
+    if (p === '/api/quit' && req.method === 'POST') { if (HEADLESS) return send(res, 200, { ok: true, headless: true }); send(res, 200, { ok: true }); return shutdown(0); }
     send(res, 404, { error: 'introuvable' });
   } catch (e) {
     if ((e.status || 500) >= 500) log('err', p, e.message);
     send(res, e.status || 500, { error: e.message, code: e.code });
   }
-});
+}
 
 // Code de sortie 75 = « redémarre-moi » (après une mise à jour) pour le lanceur.
 function shutdown(code = 0) {
-  stopLoad(); stopAllPings(); watchStopAll(); stopLocalAgent();
+  stopLoad(); stopAllPings(); watchStopAll(); stopLocalAgent(); flushJournal();
   setTimeout(() => { process.exit(typeof code === 'number' ? code : 0); }, 200);
 }
-process.on('SIGINT', () => shutdown(0)); process.on('SIGTERM', () => shutdown(0));
-// S'arrête tout seul 1 min après la fermeture de la fenêtre (rien ne tourne en fond)
-setInterval(() => { if (!clients.size && !(load && load.running) && !(full && full.running) && !updater.busy() && now() - lastClientSeen > 60000) shutdown(0); }, 10000);
-
-server.on('error', e => { if (e.code === 'EADDRINUSE') { log('déjà lancé'); return shutdown(); } throw e; });
 loadBox();
-if (settings.localAgent) startLocalAgent().catch(e => log('agent local :', e.message));
-updater.init({ version: VERSION, dataDir: DATA_DIR, appDir: __dirname, log, broadcast: (...a) => broadcast(...a), idle: () => !(load && load.running) && !(full && full.running) && !scanning });
-server.listen(PORT, HOST, () => log(`Sonde ${VERSION} prête : http://${HOST}:${PORT}`));
+if (HEADLESS) {
+  // dans l'agent : pas de serveur HTTP propre, pas de mise à jour (l'agent a la sienne), jamais d'arrêt automatique
+  log(`moteur Sonde ${VERSION} en mode serveur`);
+  module.exports = { handler, flush: flushJournal };
+  process.on('SIGTERM', () => flushJournal());
+} else {
+  process.on('SIGINT', () => shutdown(0)); process.on('SIGTERM', () => shutdown(0));
+  // S'arrête tout seul 1 min après la fermeture de la fenêtre (rien ne tourne en fond)
+  setInterval(() => { if (!clients.size && !proxied && !(load && load.running) && !(full && full.running) && !updater.busy() && now() - lastClientSeen > 60000) shutdown(0); }, 10000);
+  const server = http.createServer((req, res) => handler(req, res));
+  server.on('error', e => { if (e.code === 'EADDRINUSE') { log('déjà lancé'); return shutdown(); } throw e; });
+  if (settings.localAgent) startLocalAgent().catch(e => log('agent local :', e.message));
+  updater.init({ version: VERSION, dataDir: DATA_DIR, appDir: __dirname, log, broadcast: (...a) => broadcast(...a), idle: () => !(load && load.running) && !(full && full.running) && !scanning });
+  server.listen(PORT, HOST, () => log(`Sonde ${VERSION} prête : http://${HOST}:${PORT}`));
+}

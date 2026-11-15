@@ -416,12 +416,26 @@ function liveNow() { // service -> appareils actifs (requête DNS dans les 5 der
 function send(res, code, obj, extra = {}) { res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', ...extra }); res.end(JSON.stringify(obj)); }
 function body(req) { return new Promise(r => { let b = ''; req.on('data', d => { b += d; if (b.length > 1e4) req.destroy(); }); req.on('end', () => { try { r(JSON.parse(b || '{}')); } catch { r({}); } }); }); }
 
+// =================================================================== moteur de mesure (headless)
+// Sur un serveur (VM de la box, Docker, Debian/Ubuntu), l'agent fait lui-même toutes les mesures en continu :
+// ping des appareils, débit de la box, pics et leurs causes, historique. L'app Sonde ne fait plus qu'afficher,
+// et rien n'est faussé par le Wi‑Fi de l'ordinateur. Pas en mode « sur l'ordinateur » (l'app mesure alors elle-même).
+let engine = null;
+if (!API_LOCAL && fs.existsSync(path.join(__dirname, 'engine', 'server.js'))) {
+  try {
+    process.env.SONDE_HEADLESS = '1';
+    process.env.SONDE_DATA_DIR = F('engine');
+    process.env.SONDE_LABEL = process.env.SONDE_LABEL || 'serveur';
+    engine = require('./engine/server.js');
+    log('moteur de mesure démarré');
+  } catch (e) { log('moteur de mesure indisponible :', e.message); }
+}
 const apiHandler = async (req, res) => {
   const ip = String(req.socket.remoteAddress).replace(/^::ffff:/, '');
   if (!isLan(ip)) { res.writeHead(403); return res.end(); }
   const url = new URL(req.url, 'https://x'), p = url.pathname;
   try {
-    if (p === '/api/health') return send(res, 200, { ok: true, version: VERSION, setup: !users(), fbx: fbxState.ok, freebox: IS_FBX, dns: dnsState, local: API_LOCAL, uptime: Math.round(process.uptime()) });
+    if (p === '/api/health') return send(res, 200, { ok: true, version: VERSION, setup: !users(), fbx: fbxState.ok, freebox: IS_FBX, dns: dnsState, local: API_LOCAL, engine: !!engine, uptime: Math.round(process.uptime()) });
     if (p === '/api/setup' && req.method === 'POST') {
       if (users()) return send(res, 409, { error: 'Le compte existe déjà.' });
       const b = await body(req);
@@ -443,6 +457,12 @@ const apiHandler = async (req, res) => {
     }
     const user = authUser(req);
     if (!user) return send(res, 401, { error: 'Connexion requise.' });
+    // toutes les routes du moteur, derrière la même connexion que le reste de l'agent
+    if (p.startsWith('/api/engine/')) {
+      if (!engine) return send(res, 404, { error: 'Moteur de mesure absent sur cet agent' });
+      req.url = '/api/' + p.slice('/api/engine/'.length) + url.search;
+      return engine.handler(req, res, { embedded: true });
+    }
     if (p === '/api/logout' && req.method === 'POST') { const tok = (req.headers.authorization || '').slice(7); sessions.delete(tokHash(tok)); saveSessions(); return send(res, 200, { ok: true }); }
     if (p === '/api/password' && req.method === 'POST') {
       const b = await body(req), u = users();

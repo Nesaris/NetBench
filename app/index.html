@@ -405,6 +405,8 @@ body.no-block [data-need~=block],body.no-rename [data-need~=rename],body.no-nq [
     <div class="callout" id="scanWarn" style="display:none;margin:14px 24px 0"></div>
     <!-- DIRECT -->
     <section class="view on" id="v-live">
+      <div class="setrow" style="margin:0 0 12px;justify-content:space-between"><span class="sub" id="liveSrc" style="color:var(--text-3);font-size:var(--t-xs)"></span>
+        <div class="seg" id="liveRange" role="group" aria-label="Période affichée"><button data-r="180" aria-pressed="true">3 min</button><button data-r="1800" aria-pressed="false">30 min</button><button data-r="10800" aria-pressed="false">3 h</button><button data-r="86400" aria-pressed="false">24 h</button><button data-r="604800" aria-pressed="false">7 j</button></div></div>
       <div class="grid g-2">
         <div class="panel">
           <div class="panel-h"><h3>Trafic de la fibre, en direct</h3><div class="legend"><span><i style="background:var(--s1)"></i>Reçu par la box</span><span><i style="background:var(--s2)"></i>Envoyé</span></div></div>
@@ -737,6 +739,11 @@ body.no-block [data-need~=block],body.no-rename [data-need~=rename],body.no-nq [
           <dl class="kv" id="setBox"></dl><div class="flist" id="setFeat"></div>
           <div class="setrow"><button class="btn" id="setChange">Changer d'opérateur ou de box</button><button class="btn ghost" id="setBack">Retour</button></div>
         </div></div>
+        <div class="panel" style="margin-top:14px" id="setModeP"><div class="panel-h"><h3>Où sont faites les mesures</h3><span class="sub" id="setModeSub"></span></div><div class="panel-b">
+          <label class="setrow" style="margin:0 0 8px;align-items:flex-start"><input type="radio" name="mode" value="remote" id="modeRemote" style="margin-top:4px"> <span><b>Par l'agent, en continu</b> (recommandé) : le serveur mesure tout le temps, même app fermée. Rien n'est faussé par le Wi‑Fi de cet ordinateur, et les graphiques et le journal des pics sont gardés : tu les retrouves en rouvrant Sonde.</span></label>
+          <label class="setrow" style="margin:0 0 8px;align-items:flex-start"><input type="radio" name="mode" value="local" id="modeLocal" style="margin-top:4px"> <span><b>Depuis cet ordinateur</b>, seulement quand Sonde est ouverte.</span></label>
+          <p class="note" id="setModeNote" style="font-size:var(--t-xs);margin:4px 0 0"></p>
+        </div></div>
         <div class="panel" style="margin-top:14px"><div class="panel-h"><h3>Mises à jour</h3><span class="sub" id="updSub"></span></div><div class="panel-b">
           <p class="note" id="updTxt" style="margin:0 0 10px"></p>
           <label class="setrow" style="margin:0 0 10px"><input type="checkbox" id="updAuto"> Installer les mises à jour automatiquement (vérifiées toutes les 6 h)</label>
@@ -807,7 +814,8 @@ function toast(msg, err) { const t = $('#toast'); t.textContent = msg; t.classNa
 class Chart {
   constructor(cv, o) { this.cv = cv; this.o = Object.assign({ win: 60, unit: '', fmt: v => nf0.format(v), min: 10 }, o); this.series = new Map(); this.dirty = true; new ResizeObserver(() => this.dirty = true).observe(cv); }
   set(key, label, color) { if (!this.series.has(key)) this.series.set(key, { label, color, pts: [] }); const s = this.series.get(key); s.label = label; s.color = color; this.dirty = true; }
-  push(key, t, v) { const s = this.series.get(key); if (!s) return; s.pts.push([t, v]); const lim = t - 3600e3; while (s.pts.length && s.pts[0][0] < lim) s.pts.shift(); this.dirty = true; }
+  push(key, t, v) { const s = this.series.get(key); if (!s) return; s.pts.push([t, v]); const lim = t - Math.max(3600e3, this.o.win * 1000 + 60e3); while (s.pts.length && s.pts[0][0] < lim) s.pts.shift(); this.dirty = true; }
+  load(key, pts) { const s = this.series.get(key); if (!s) return; const last = pts.length ? pts[pts.length - 1][0] : 0; s.pts = pts.concat(s.pts.filter(p => p[0] > last)); this.dirty = true; }
   clear() { this.series.clear(); this.dirty = true; }
   draw() {
     const cv = this.cv; if (!cv.offsetParent) return;
@@ -830,8 +838,9 @@ class Chart {
       g.textAlign = 'right'; g.fillText(this.o.fmt(v), L - 8, y);
     }
     g.textAlign = 'center'; g.textBaseline = 'top';
-    const tickS = this.o.win <= 60 ? 15 : this.o.win <= 180 ? 30 : 120;
-    for (let s = 0; s <= this.o.win; s += tickS) { const x = X(tEnd - s * 1000); g.fillText(s ? '-' + (s >= 60 ? (s / 60) + ' min' : s + ' s') : 'maint.', Math.min(Math.max(x, L + 14), L + w - 18), T + h + 6); }
+    const wn = this.o.win, tickS = wn <= 60 ? 15 : wn <= 180 ? 30 : wn <= 1800 ? 300 : wn <= 10800 ? 1800 : wn <= 86400 ? 14400 : 86400;
+    const lbl = s => !s ? 'maint.' : '-' + (s >= 86400 ? (s / 86400) + ' j' : s >= 3600 ? (s / 3600) + ' h' : s >= 60 ? (s / 60) + ' min' : s + ' s');
+    for (let s = 0; s <= wn; s += tickS) { const x = X(tEnd - s * 1000); g.fillText(lbl(s), Math.min(Math.max(x, L + 14), L + w - 18), T + h + 6); }
     if (this.o.ceiling && this.o.ceiling() <= max) {
       const y = Math.round(Y(this.o.ceiling())) + .5; g.setLineDash([4, 4]); g.strokeStyle = css('--text-3'); g.beginPath(); g.moveTo(L, y); g.lineTo(L + w, y); g.stroke(); g.setLineDash([]);
       g.textAlign = 'left'; g.textBaseline = 'bottom'; g.fillStyle = css('--text-2'); g.fillText(this.o.ceilingLabel || '', L + 6, y - 3);
@@ -1002,8 +1011,25 @@ async function loadWatch() {
   try {
     const w = await api('/api/watch');
     consSeries(w.targets); EV = w.events; renderEvents();
+    if (!loadWatch.did) { loadWatch.did = true; loadRange(); }
   } catch { }
 }
+// Période des graphiques du direct : l'historique vient du moteur (journal seconde par seconde)
+let RANGE = +store.get('liveRange', 180);
+async function loadRange() {
+  $$('#liveRange button').forEach(b => b.setAttribute('aria-pressed', +b.dataset.r === RANGE));
+  cWan.o.win = RANGE; cCons.o.win = Math.max(120, RANGE);
+  try {
+    const h = await api('/api/history/live?range=' + RANGE);
+    cWan.load('d', h.wan.map(x => [x[0], x[1]])); cWan.load('u', h.wan.map(x => [x[0], x[2]]));
+    const byName = Object.fromEntries(Object.entries(W.names).map(([k, n]) => [n, k]));
+    for (const [name, pts] of Object.entries(h.pings)) { const k = byName[name]; if (k) cCons.load(k, pts); }
+    if (h.oldest && RANGE > 600 && h.oldest > Date.now() - RANGE * 1000 + 600e3) $('#liveSrc').textContent = `historique disponible depuis ${new Date(h.oldest).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}`;
+    else liveSrcText();
+  } catch { }
+}
+function liveSrcText() { $('#liveSrc').textContent = MODE.active ? `Mesures faites en continu par l'agent (${MODE.agent ? new URL(MODE.agent).hostname : ''}) · rien n'est faussé par le Wi‑Fi de cet ordinateur` : 'Mesures faites depuis cet ordinateur, seulement quand Sonde est ouvert'; }
+$$('#liveRange button').forEach(b => b.onclick = () => { RANGE = +b.dataset.r; store.set('liveRange', RANGE); loadRange(); });
 
 /* ============ PING ============ */
 const cPing = new Chart($('#cPing'), { win: 60, fmt: v => nf0.format(v) + ' ms', min: 20, fixed: null });
@@ -1011,7 +1037,7 @@ charts.push(cPing);
 $('#pScale').onchange = e => { const v = e.target.value; cPing.o.fixed = v === 'auto' ? null : () => +v; };
 $('#pWin').onchange = e => { cPing.o.win = +e.target.value; };
 function pingTargets(withInet) {
-  const t = [{ key: 'ref', ip: '192.168.1.254', name: 'Box (référence Mac)' }];
+  const t = [{ key: 'ref', ip: S.gw || '192.168.1.254', name: 'Box (référence Mac)' }];
   if (withInet) t.push({ key: 'inet', ip: '1.1.1.1', name: 'Internet · 1.1.1.1' });
   for (const d of selected()) t.push({ key: 'd:' + d.id, ip: d.ip, name: d.name });
   return t;
@@ -1853,10 +1879,12 @@ function onAuth(a) {
   if (a.status === 'granted') wizardDone(); else if (a.status !== 'pending' && $('#bAuth')) $('#bAuth').disabled = false;
 }
 // Ce que la box permet : on masque ce qui n'a pas de sens (signal, trafic par appareil, blocage…)
-let FEAT = null, OSN = 'Mac';
+let FEAT = null, OSN = 'Mac', MODE = {};
 async function applyFeatures() {
+  MODE = await api('/api/mode').catch(() => ({}));
   const su = await api('/api/setup').catch(() => null); if (!su) return;
-  FEAT = su.features || {}; OSN = su.osLabel || 'Mac';
+  FEAT = su.features || {}; OSN = su.osLabel || 'Mac'; S.gw = String(su.config?.host || '').split(':')[0] || null;
+  liveSrcText();
   const b = document.body;
   for (const [cls, on] of [['no-signal', !FEAT.signal], ['no-rate', !FEAT.perDeviceRate], ['no-block', !FEAT.block], ['no-rename', !FEAT.rename], ['no-nq', !su.hasNQ], ['no-repeater', !FEAT.repeater], ['no-ports', !FEAT.ports], ['no-wanrate', !FEAT.wanRate]]) b.classList.toggle(cls, !!on);
   if (OSN !== 'Mac') relabel(document.body);
@@ -1876,8 +1904,16 @@ async function openSettings() {
   $('#setBox').innerHTML = kv([['Box', c.model || su.label], ['Adresse', c.host], ['Connexion', su.auth?.ok ? 'autorisée' : 'à faire'], ['Ordinateur', su.osLabel + ' · Sonde ' + su.version]]);
   const L = { signal: 'signal Wi‑Fi', perDeviceRate: 'trafic par appareil', wanRate: 'débit de la fibre', rename: 'renommer', block: 'bloquer un appareil', repeater: 'répéteur', ports: 'ports' };
   $('#setFeat').innerHTML = Object.entries(L).map(([k, l]) => `<span class="chip ${f[k] ? 'ok' : ''}">${f[k] ? '' : 'pas de '}${l}</span>`).join('') + (f.experimental ? '<span class="chip warn">prise en charge expérimentale</span>' : '');
-  loadUpdate();
+  loadUpdate(); loadModePanel();
 }
+async function loadModePanel() {
+  const [m, st] = await Promise.all([api('/api/mode').catch(() => ({})), api('/api/agent/status').catch(() => ({}))]);
+  const ok = st.configured && st.reachable && st.logged && !st.local && st.engine;
+  $('#modeRemote').checked = !!m.remote; $('#modeLocal').checked = !m.remote; $('#modeRemote').disabled = !ok && !m.remote;
+  $('#setModeSub').textContent = m.active ? 'agent ' + new URL(m.agent).hostname : 'cet ordinateur';
+  $('#setModeNote').textContent = ok ? '' : !st.configured || st.local ? 'Installe l\'agent sur un serveur (Docker, Debian/Ubuntu ou VM de la box) et connecte-toi dans l\'onglet Services pour activer les mesures en continu.' : !st.engine ? 'Cet agent est trop ancien : mets-le à jour pour qu\'il fasse les mesures.' : !st.logged ? 'Connecte-toi à l\'agent dans l\'onglet Services.' : 'Agent injoignable pour l\'instant.';
+}
+$$('#setModeP input[name=mode]').forEach(r => r.onchange = async () => { await api('/api/mode', { remote: $('#modeRemote').checked }); toast($('#modeRemote').checked ? 'Les mesures passent par l\'agent. Rechargement…' : 'Les mesures reviennent sur cet ordinateur. Rechargement…'); setTimeout(() => location.reload(), 900); });
 async function loadUpdate() {
   const u = await api('/api/update').catch(() => null); if (!u) return;
   $('#updAuto').checked = !!u.auto;

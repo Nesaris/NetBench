@@ -35,7 +35,13 @@ fs.writeFileSync(appFile, JSON.stringify({ name: 'sonde-app', version: ver, date
 
 // ---- archive de l'agent (Docker, Debian/Ubuntu)
 const agentFile = path.join(OUT, `sonde-agent-${ver}.tar.gz`);
-sh('tar', ['-czf', agentFile, '-C', path.join(ROOT, 'agent'), 'agent.js', 'services.js', 'version.json', 'Dockerfile', 'docker-entrypoint.sh', 'docker-compose.yml', 'install.sh'], { env: { ...process.env, COPYFILE_DISABLE: '1' } });
+// l'agent embarque le moteur de mesure (dossier engine/ = app/ sans l'interface)
+const STAGE = path.join(OUT, 'agent-stage'); fs.mkdirSync(STAGE);
+for (const f of ['agent.js', 'services.js', 'version.json', 'Dockerfile', 'docker-entrypoint.sh', 'docker-compose.yml', 'install.sh']) fs.copyFileSync(path.join(ROOT, 'agent', f), path.join(STAGE, f));
+fs.cpSync(path.join(ROOT, 'app'), path.join(STAGE, 'engine'), { recursive: true, filter: src => !/\.DS_Store$/.test(src) });
+for (const f of ['install.sh', 'docker-entrypoint.sh']) fs.chmodSync(path.join(STAGE, f), 0o755);
+sh('tar', ['-czf', agentFile, '-C', STAGE, '.'], { env: { ...process.env, COPYFILE_DISABLE: '1' } });
+fs.rmSync(STAGE, { recursive: true, force: true });
 
 // ---- signatures + vérification avec la clé publique du code
 const pubB64 = (fs.readFileSync(path.join(ROOT, 'app/lib/updater.js'), 'utf8').match(/MCowBQYDK2VwAyEA[A-Za-z0-9+/=]{44}/) || [])[0];

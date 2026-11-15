@@ -12,9 +12,9 @@ const run = (cmd, args, timeout = 5000, input) => new Promise(res => {
   if (input != null) { p.stdin.end(input); }
 });
 
-const dataDir = OS === 'mac' ? path.join(os.homedir(), 'Library', 'Application Support', 'Sonde')
+const dataDir = process.env.SONDE_DATA_DIR || (OS === 'mac' ? path.join(os.homedir(), 'Library', 'Application Support', 'Sonde')
   : OS === 'win' ? path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'Sonde')
-  : path.join(process.env.XDG_DATA_HOME || path.join(os.homedir(), '.local', 'share'), 'sonde');
+  : path.join(process.env.XDG_DATA_HOME || path.join(os.homedir(), '.local', 'share'), 'sonde'));
 fs.mkdirSync(dataDir, { recursive: true });
 
 // ---------------------------------------------------------------- ping
@@ -175,6 +175,6 @@ async function networkQuality() {
   try { const j = JSON.parse(await run('/usr/bin/networkQuality', ['-c', '-s'], 90000)); return { ok: true, down: Math.round(j.dl_throughput / 1e6), up: Math.round(j.ul_throughput / 1e6), idle: Math.round(j.base_rtt * 10) / 10, rpmDown: j.dl_responsiveness, rpmUp: j.ul_responsiveness, iface: j.interface_name }; }
   catch (e) { return { ok: false, error: 'sortie illisible' }; }
 }
-const label = OS === 'mac' ? 'Mac' : OS === 'win' ? 'PC' : 'ordinateur';
+const label = process.env.SONDE_LABEL || (OS === 'mac' ? 'Mac' : OS === 'win' ? 'PC' : 'ordinateur');
 
 module.exports = { OS, label, dataDir, parsePing, pingStream, pingBurst, wifiInfo, gateway, arpTable, secrets, wifiScans, networkQuality, hasNQ: OS === 'mac' };

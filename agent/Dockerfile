@@ -1,8 +1,10 @@
 # Sonde Agent — image minimale (Node officiel sur Alpine), aucune dépendance npm.
 FROM node:22-alpine
-RUN apk add --no-cache openssl
+RUN apk add --no-cache openssl iputils
 WORKDIR /opt/sonde-agent
 COPY agent.js services.js version.json ./
+# moteur de mesure (ping continu, débit de la box, historique) : le même que celui de l'app
+COPY engine ./engine
 COPY docker-entrypoint.sh /usr/local/bin/sonde-agent-entrypoint
 RUN chmod 0755 /usr/local/bin/sonde-agent-entrypoint
 ENV SONDE_DATA=/data

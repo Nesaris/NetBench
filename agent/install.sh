@@ -78,6 +78,11 @@ echo "$MODE" > "$DIR/mode"
 # le script lui-même (dans le paquet signé), pour les mises à jour automatiques
 [ -f "$DIR/app/install.sh" ] && install -m 755 "$DIR/app/install.sh" "$DIR/install.sh"
 
+# ---------------------------------------------------------------- ping sans droits root (mesures en continu)
+command -v ping >/dev/null || apt-get install -y -qq iputils-ping >/dev/null
+echo 'net.ipv4.ping_group_range = 0 2147483647' > /etc/sysctl.d/60-sonde-ping.conf
+sysctl -q -p /etc/sysctl.d/60-sonde-ping.conf || true
+
 # ---------------------------------------------------------------- certificat HTTPS de l'agent
 if [ ! -s "$DATA/tls.key" ]; then
   openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:prime256v1 -nodes -days 3650 -subj "/CN=sonde-agent" -keyout "$DATA/tls.key" -out "$DATA/tls.crt" 2>/dev/null
@@ -114,6 +119,7 @@ Group=sonde-agent
 ExecStart=$NODE $DIR/app/agent.js
 Environment=SONDE_DATA=$DATA
 Environment=SONDE_MIN_FREE_GB=1
+Environment=SONDE_JOURNAL_MB=1500
 Restart=always
 RestartSec=3
 AmbientCapabilities=CAP_NET_BIND_SERVICE

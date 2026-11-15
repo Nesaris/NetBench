@@ -13,7 +13,7 @@ services:
       - SONDE_MIN_FREE_GB=1
       # - SONDE_BOX=192.168.1.1        # adresse de la box si elle n'est pas détectée
     cap_drop: [ALL]
-    cap_add: [NET_BIND_SERVICE]
+    cap_add: [NET_BIND_SERVICE, NET_RAW]   # NET_RAW : ping des appareils
     read_only: true
     tmpfs: [/tmp]
     security_opt: [no-new-privileges:true]
