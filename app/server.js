@@ -608,8 +608,9 @@ function saveHistory(entry) {
 // Connexion HTTPS avec certificat auto-signé : son empreinte est mémorisée au premier contact
 // (comme SSH), puis toute autre empreinte est refusée.
 const AGENT_FILE = path.join(DATA_DIR, 'agent.json');
-const agentCfg = () => { try { return JSON.parse(fs.readFileSync(AGENT_FILE, 'utf8')); } catch { return {}; } };
-const saveAgent = c => fs.writeFileSync(AGENT_FILE, JSON.stringify(c), { mode: 0o600 });
+// Le jeton de connexion au serveur est rangé dans le coffre du système (trousseau / DPAPI), pas dans un fichier.
+const agentCfg = () => { let c = {}; try { c = JSON.parse(fs.readFileSync(AGENT_FILE, 'utf8')); } catch { } if (c.token) { platform.secrets.set('agent-token', c.token); delete c.token; fs.writeFileSync(AGENT_FILE, JSON.stringify(c), { mode: 0o600 }); } const t = c.url ? platform.secrets.get('agent-token') : null; return t ? { ...c, token: t } : c; };
+const saveAgent = c => { const { token, ...rest } = c; if (token) platform.secrets.set('agent-token', token); else platform.secrets.del('agent-token'); fs.writeFileSync(AGENT_FILE, JSON.stringify(rest), { mode: 0o600 }); };
 // Pas de reprise de session TLS : le certificat est relu et vérifié à chaque connexion.
 const agentHttpsAgent = new https.Agent({ keepAlive: false, maxCachedSessions: 0 });
 function agentReq(method, p, payload, opts = {}) {
@@ -677,7 +678,8 @@ const okHost = h => h === `127.0.0.1:${PORT}` || h === `localhost:${PORT}`;
 // ---------------------------------------------------------------- mode « mesures par l'agent »
 // L'app ne mesure plus rien elle-même : toutes les routes du moteur sont relayées vers l'agent (HTTPS, certificat épinglé).
 const LOCAL_ONLY = /^\/api\/(update|agent\/|mode$|quit$|logo$)/;
-const remoteOn = () => { if (HEADLESS || !settings.remote) return false; const c = agentCfg(); return !!(c.url && c.token && !c.local); };
+// Sans jeton, on ne repasse pas en douce sur les mesures locales : l'app demande de se connecter au serveur.
+const remoteOn = () => { if (HEADLESS || !settings.remote) return false; const c = agentCfg(); return !!(c.url && !c.local); };
 function proxyToAgent(req, res, p, search) {
   const c = agentCfg();
   const u = new URL('/api/engine/' + p.slice(5) + search, c.url);
@@ -686,11 +688,11 @@ function proxyToAgent(req, res, p, search) {
   const up = https.request(u, {
     method: req.method, rejectUnauthorized: false, agent: agentHttpsAgent, timeout: sse ? 0 : 60000,
     checkServerIdentity: (h, cert) => { seenFp = cert && cert.fingerprint256; if (c.fp && seenFp !== c.fp) return new Error('Certificat de l\'agent différent de celui mémorisé'); },
-    headers: { authorization: 'Bearer ' + c.token, 'content-type': req.headers['content-type'] || 'application/json', ...(req.headers['content-length'] ? { 'content-length': req.headers['content-length'] } : {}) }
+    headers: { ...(c.token ? { authorization: 'Bearer ' + c.token } : {}), 'content-type': req.headers['content-type'] || 'application/json', ...(req.headers['content-length'] ? { 'content-length': req.headers['content-length'] } : {}) }
   }, ur => {
     const fp = seenFp || ur.socket.getPeerCertificate()?.fingerprint256;
     if (c.fp && fp !== c.fp) { ur.resume(); return send(res, 495, { error: 'Certificat de l\'agent différent de celui mémorisé : connexion refusée.' }); }
-    if (ur.statusCode === 401) { const { token, ...rest } = c; saveAgent(rest); }
+    if (ur.statusCode === 401) { ur.resume(); const { token, ...rest } = c; saveAgent(rest); return send(res, 401, { error: 'Connexion au serveur Sonde requise', needAgentLogin: true, agent: c.url, user: c.user || null }); }
     if (sse) { proxied++; lastClientSeen = now(); res.on('close', () => { proxied--; lastClientSeen = now(); up.destroy(); }); }
     res.writeHead(ur.statusCode, { 'content-type': ur.headers['content-type'] || 'application/json', 'cache-control': 'no-store', ...(sse ? { connection: 'keep-alive' } : {}) });
     ur.pipe(res);
@@ -839,7 +841,7 @@ async function handler(req, res, opts = {}) {
       }
       if (sub === '/login' && req.method === 'POST') {
         const b = await body(req);
-        const r = await agentReq('POST', '/api/login', { user: b.user, pass: b.pass }, { noAuth: true });
+        const r = await agentReq('POST', '/api/login', { user: b.user, pass: b.pass, device: os.hostname().replace(/\.local$/, '') }, { noAuth: true });
         if (r.status === 200 && r.body.token) { saveAgent({ ...c, token: r.body.token, user: r.body.user }); return send(res, 200, { ok: true, user: r.body.user }); }
         return send(res, r.status, r.body);
       }
@@ -869,7 +871,7 @@ async function handler(req, res, opts = {}) {
         up.end(); return;
       }
       if (sub === '/logout' && req.method === 'POST') { try { await agentReq('POST', '/api/logout'); } catch { } const { token, user, ...rest } = c; saveAgent(rest); return send(res, 200, { ok: true }); }
-      const allowed = { 'GET /services': 1, 'GET /recent': 1, 'GET /history': 1, 'GET /fbx/status': 1, 'GET /storage': 1, 'GET /blocks': 1, 'POST /blocks': 1, 'POST /blocks/delete': 1, 'GET /alerts': 1, 'POST /alerts': 1, 'GET /catalog': 1, 'POST /fbx/authorize': 1, 'POST /password': 1, 'GET /priority': 1, 'POST /priority': 1 };
+      const allowed = { 'GET /services': 1, 'GET /recent': 1, 'GET /history': 1, 'GET /fbx/status': 1, 'GET /storage': 1, 'GET /blocks': 1, 'POST /blocks': 1, 'POST /blocks/delete': 1, 'GET /alerts': 1, 'POST /alerts': 1, 'GET /catalog': 1, 'POST /fbx/authorize': 1, 'POST /password': 1, 'GET /priority': 1, 'POST /priority': 1, 'GET /sessions': 1, 'POST /sessions/revoke': 1 };
       if (!allowed[req.method + ' ' + sub]) return send(res, 404, { error: 'introuvable' });
       const r = await agentReq(req.method, '/api' + sub + url.search, req.method === 'POST' ? await body(req) : null);
       if (r.status === 401 && c.token) { const { token, ...rest } = c; saveAgent(rest); }

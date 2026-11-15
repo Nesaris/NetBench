@@ -743,6 +743,8 @@ body.no-block [data-need~=block],body.no-rename [data-need~=rename],body.no-nq [
           <label style="display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;margin:0 0 10px;cursor:pointer"><input type="radio" name="mode" value="remote" id="modeRemote" style="margin-top:4px"> <span><b>Par l'agent, en continu</b> (recommandé) : le serveur mesure tout le temps, même app fermée. Rien n'est faussé par le Wi‑Fi de cet ordinateur, et les graphiques et le journal des pics sont gardés : tu les retrouves en rouvrant Sonde.</span></label>
           <label style="display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;margin:0 0 10px;cursor:pointer"><input type="radio" name="mode" value="local" id="modeLocal" style="margin-top:4px"> <span><b>Depuis cet ordinateur</b>, seulement quand Sonde est ouverte.</span></label>
           <p class="note" id="setModeNote" style="font-size:var(--t-xs);margin:4px 0 0"></p>
+          <div id="sessBox" style="display:none;margin-top:14px"><div class="lb" style="font-size:var(--t-sm);color:var(--text-2);margin-bottom:6px">Appareils connectés au serveur</div><div class="rows" id="sessList"></div>
+            <div class="setrow"><button class="btn sm" id="sessOthers">Déconnecter tous les autres</button></div></div>
         </div></div>
         <div class="panel" style="margin-top:14px"><div class="panel-h"><h3>Mises à jour</h3><span class="sub" id="updSub"></span></div><div class="panel-b">
           <p class="note" id="updTxt" style="margin:0 0 10px"></p>
@@ -805,7 +807,7 @@ const bandTxt = b => ({ '2d4g': '2,4 GHz', '5g': '5 GHz', '6g': '6 GHz' }[b] || 
 async function api(p, b) {
   const r = await fetch(p, b === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) });
   const j = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(j.error || r.statusText);
+  if (!r.ok) { if (j.needAgentLogin) openAgentLogin(j); throw Object.assign(new Error(j.error || r.statusText), { status: r.status, body: j }); }
   return j;
 }
 function toast(msg, err) { const t = $('#toast'); t.textContent = msg; t.className = 'toast on' + (err ? ' err' : ''); clearTimeout(toast.t); toast.t = setTimeout(() => t.className = 'toast', 5000); }
@@ -938,7 +940,7 @@ function onWan(w) {
 }
 async function loadOverview() {
   let o;
-  try { o = await api('/api/overview'); } catch (e) { return toast('Moteur injoignable : ' + e.message, true); }
+  try { o = await api('/api/overview'); } catch (e) { if (e.body?.needAgentLogin) return; return toast('Moteur injoignable : ' + e.message, true); }
   if (o.needSetup || o.needAuth) { if (!$('#v-auth').classList.contains('on')) openWizard(); return; }
   if ($('#v-auth').classList.contains('on') || $('#v-set').classList.contains('on')) return;
   $('nav.tabs').style.display = '';
@@ -1872,6 +1874,20 @@ function renderWizard() {
     $('#wzBack').onclick = async () => { await api('/api/setup/reset', {}).catch(() => { }); WZ.setup = await api('/api/setup'); WZ.step = 'isp'; renderWizard(); };
   }
 }
+// Connexion au serveur Sonde (agent) : une seule fois, la session est ensuite prolongée à chaque utilisation.
+function openAgentLogin(info = {}) {
+  if (openAgentLogin.on) return; openAgentLogin.on = true;
+  $('nav.tabs').style.display = 'none'; show('auth');
+  const host = info.agent ? new URL(info.agent).hostname : 'serveur';
+  $('#wiz').innerHTML = `<h1>Connexion au serveur Sonde</h1><p>Les mesures sont faites par le serveur Sonde (${esc(host)}). Connecte-toi avec l'identifiant et le mot de passe choisis à son installation. Tu ne le feras qu'une fois sur cet ordinateur : la connexion reste active tant que tu utilises Sonde au moins une fois par an. Sans ces codes, personne ne peut lire ni piloter le serveur.</p>
+    <div class="fld"><label for="alU">Identifiant</label><input id="alU" autocomplete="username" value="${esc(info.user || '')}"></div>
+    <div class="fld"><label for="alP">Mot de passe</label><input id="alP" type="password" autocomplete="current-password"></div>
+    <div class="setrow"><button class="btn primary" id="alGo">Se connecter</button><button class="btn ghost" id="alLocal">Mesurer depuis cet ordinateur à la place</button></div><p id="alSt" class="mono" style="font-size:var(--t-sm)"></p>`;
+  const go = async () => { $('#alGo').disabled = true; $('#alSt').textContent = 'Connexion…'; try { await api('/api/agent/login', { user: $('#alU').value.trim(), pass: $('#alP').value }); $('#alP').value = ''; location.reload(); } catch (e) { $('#alSt').textContent = e.message; $('#alGo').disabled = false; } };
+  $('#alGo').onclick = go; $('#alP').onkeydown = e => { if (e.key === 'Enter') go(); };
+  $('#alLocal').onclick = async () => { await api('/api/mode', { remote: false }); location.reload(); };
+  setTimeout(() => ($('#alU').value ? $('#alP') : $('#alU')).focus(), 50);
+}
 async function wizardDone() { $('#wiz').innerHTML = `${stepsBar(2)}<h1>C'est prêt</h1><p>Chargement des appareils…</p>`; await applyFeatures(); setTimeout(() => { $('nav.tabs').style.display = ''; show('live'); loadOverview(); }, 700); }
 function onAuth(a) {
   const t = { granted: 'Autorisé. Chargement…', denied: 'Refusé sur la box.', timeout: 'Délai dépassé, recommence.', pending: 'En attente de validation sur la box…' };
@@ -1911,8 +1927,18 @@ async function loadModePanel() {
   const ok = st.configured && st.reachable && st.logged && !st.local && st.engine;
   $('#modeRemote').checked = !!m.remote; $('#modeLocal').checked = !m.remote; $('#modeRemote').disabled = !ok && !m.remote;
   $('#setModeSub').textContent = m.active ? 'agent ' + new URL(m.agent).hostname : 'cet ordinateur';
-  $('#setModeNote').textContent = ok ? '' : !st.configured || st.local ? 'Installe l\'agent sur un serveur (Docker, Debian/Ubuntu ou VM de la box) et connecte-toi dans l\'onglet Services pour activer les mesures en continu.' : !st.engine ? 'Cet agent est trop ancien : mets-le à jour pour qu\'il fasse les mesures.' : !st.logged ? 'Connecte-toi à l\'agent dans l\'onglet Services.' : 'Agent injoignable pour l\'instant.';
+  if (ok) loadSessions();
+  $('#setModeNote').textContent = ok ? 'Connexion au serveur protégée par ton identifiant et ton mot de passe : un autre appareil ne peut rien voir ni piloter sans eux. Le serveur n\'est joignable que depuis le réseau de la maison.' : !st.configured || st.local ? 'Installe l\'agent sur un serveur (Docker, Debian/Ubuntu ou VM de la box) et connecte-toi dans l\'onglet Services pour activer les mesures en continu.' : !st.engine ? 'Cet agent est trop ancien : mets-le à jour pour qu\'il fasse les mesures.' : !st.logged ? 'Connecte-toi à l\'agent dans l\'onglet Services.' : 'Agent injoignable pour l\'instant.';
 }
+async function loadSessions() {
+  const l = await api('/api/agent/sessions').catch(() => null); if (!l) return;
+  $('#sessBox').style.display = '';
+  const d = t => t ? new Date(t).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }) : '—';
+  $('#sessList').innerHTML = l.map(x => `<div class="row"><span class="k">${esc(x.name || 'Appareil')}${x.current ? ' <span class="chip ok">celui-ci</span>' : ''}</span><span class="d">${esc(x.ip || '')} · vu le ${d(x.last)}</span><span class="e">${x.current ? '' : `<button class="btn sm ghost" data-rv="${esc(x.id)}">Déconnecter</button>`}</span></div>`).join('');
+  $('#sessOthers').style.display = l.length > 1 ? '' : 'none';
+}
+$('#sessList').addEventListener('click', async e => { const b = e.target.closest('[data-rv]'); if (!b) return; await api('/api/agent/sessions/revoke', { id: b.dataset.rv }).catch(x => toast(x.message, true)); loadSessions(); });
+$('#sessOthers').onclick = async () => { if (!(await ask('Déconnecter les autres appareils ?', 'Tous les autres appareils devront retaper l\'identifiant et le mot de passe du serveur.', 'Déconnecter'))) return; await api('/api/agent/sessions/revoke', { others: true }); loadSessions(); toast('Les autres appareils sont déconnectés.'); };
 $$('#setModeP input[name=mode]').forEach(r => r.onchange = async () => { await api('/api/mode', { remote: $('#modeRemote').checked }); toast($('#modeRemote').checked ? 'Les mesures passent par l\'agent. Rechargement…' : 'Les mesures reviennent sur cet ordinateur. Rechargement…'); setTimeout(() => location.reload(), 900); });
 async function loadUpdate() {
   const u = await api('/api/update').catch(() => null); if (!u) return;

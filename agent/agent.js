@@ -376,9 +376,13 @@ function authUser(req) {
   const c = (req.headers.cookie || '').match(/(?:^|;\s*)sonde=([a-f0-9]{64})/);
   const tok = h.startsWith('Bearer ') ? h.slice(7) : c ? c[1] : null;
   if (!tok || !/^[a-f0-9]{64}$/.test(tok)) return null;
-  const s = sessions.get(tokHash(tok)); if (!s || s.exp < now()) return null;
+  const k = tokHash(tok), s = sessions.get(k); if (!s || s.exp < now()) return null;
+  // connexion « une fois pour toutes » : la session est prolongée d'un an à chaque utilisation
+  if (s.exp - now() < 364 * 86400e3 || now() - (s.last || 0) > 3600e3) { s.exp = now() + 365 * 86400e3; s.last = now(); s.ip = String(req.socket.remoteAddress).replace(/^::ffff:/, ''); saveSessionsSoon(); }
+  req.sessionKey = k;
   return s.user;
 }
+let saveT = null; const saveSessionsSoon = () => { if (!saveT) saveT = setTimeout(() => { saveT = null; saveSessions(); }, 5000); };
 
 // =================================================================== API HTTPS
 function svcInfo(id) { return SERVICES.find(s => s.id === id) || (id === OTHER.id ? OTHER : UNKNOWN); }
@@ -452,7 +456,7 @@ const apiHandler = async (req, res) => {
       if (!ok) { const n = (f && f.until < now() ? 0 : (f?.n || 0)) + 1; fails.set(ip, { n, until: n >= 5 ? now() + 15 * 60e3 : 0 }); await new Promise(r => setTimeout(r, 400)); return send(res, 401, { error: 'Identifiant ou mot de passe incorrect.' }); }
       fails.delete(ip);
       const tok = crypto.randomBytes(32).toString('hex');
-      sessions.set(tokHash(tok), { user: u.user, exp: now() + 30 * 86400e3 }); saveSessions();
+      sessions.set(tokHash(tok), { user: u.user, exp: now() + 365 * 86400e3, created: now(), last: now(), ip, name: String(b.device || '').replace(/[^\w .'’-]/g, '').slice(0, 40) || null }); saveSessions();
       return send(res, 200, { token: tok, user: u.user }, { 'set-cookie': `sonde=${tok}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${30 * 86400}` });
     }
     const user = authUser(req);
@@ -462,6 +466,13 @@ const apiHandler = async (req, res) => {
       if (!engine) return send(res, 404, { error: 'Moteur de mesure absent sur cet agent' });
       req.url = '/api/' + p.slice('/api/engine/'.length) + url.search;
       return engine.handler(req, res, { embedded: true });
+    }
+    // appareils connectés à ce serveur, et déconnexion à distance
+    if (p === '/api/sessions' && req.method === 'GET') return send(res, 200, [...sessions].filter(([, x]) => x.exp > now()).map(([k, x]) => ({ id: k.slice(0, 12), name: x.name || null, ip: x.ip || null, created: x.created || null, last: x.last || null, current: k === req.sessionKey })).sort((a, b) => (b.last || 0) - (a.last || 0)));
+    if (p === '/api/sessions/revoke' && req.method === 'POST') {
+      const b = await body(req); let n = 0;
+      for (const k of [...sessions.keys()]) if (k !== req.sessionKey && (b.others || k.slice(0, 12) === b.id)) { sessions.delete(k); n++; }
+      saveSessions(); return send(res, 200, { ok: true, n });
     }
     if (p === '/api/logout' && req.method === 'POST') { const tok = (req.headers.authorization || '').slice(7); sessions.delete(tokHash(tok)); saveSessions(); return send(res, 200, { ok: true }); }
     if (p === '/api/password' && req.method === 'POST') {
