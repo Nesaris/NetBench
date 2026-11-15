@@ -35,7 +35,7 @@ function create(ctx, cfg) {
     },
     async login() {
       const t = this.token(true);
-      if (!t) throw err('Sonde n\'est pas encore autorisée sur la Freebox', 'no_token');
+      if (!t) throw err('Pouls n\'est pas encore autorisé sur la Freebox', 'no_token');
       const ch = (await this.raw('/login/')).result.challenge;
       const password = crypto.createHmac('sha1', t.tok).update(ch).digest('hex');
       const s = await this.raw('/login/session/', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ app_id: t.appId, password }) });
@@ -118,7 +118,7 @@ function create(ctx, cfg) {
     async authState() { return { ok: !!fbx.token(), kind: 'button' }; },
     async authorize() {
       if (fbx.authorizing) return fbx.authorizing;
-      const r = await fbx.raw('/login/authorize/', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ app_id: APP_ID, app_name: 'Sonde', app_version: ctx.version, device_name: os.hostname() }) });
+      const r = await fbx.raw('/login/authorize/', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ app_id: APP_ID, app_name: 'Pouls', app_version: ctx.version, device_name: os.hostname() }) });
       if (!r.success) throw err(r.msg || 'Autorisation impossible', 'auth_failed');
       const { app_token, track_id } = r.result;
       fbx.authorizing = { status: 'pending' };

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Installe Sonde sur Mac (ou le met à jour, ou le désinstalle avec --uninstall).
+# Installe Pouls (anciennement Sonde) sur Mac (ou le met à jour, ou le désinstalle avec --uninstall).
 #   curl -fsSL https://raw.githubusercontent.com/Nesaris/sonde/main/install/mac.sh | bash
 # Rien n'est installé en dehors de ton dossier utilisateur, aucun mot de passe administrateur n'est demandé.
 # Node.js est téléchargé depuis nodejs.org (empreinte SHA-256 vérifiée) et Sonde depuis les releases GitHub
@@ -11,7 +11,8 @@ PUBKEY='MCowBQYDK2VwAyEAY03Xgj+jmh+tZbBD0cI+qQuVwLH+L6/0qAGwyCFflE4='
 LABEL=fr.nesaris.sonde
 SUP="$HOME/Library/Application Support/Sonde"
 ROOT="$SUP/app"
-APP="$HOME/Applications/Sonde.app"
+APP="$HOME/Applications/Pouls.app"
+OLDAPP="$HOME/Applications/Sonde.app"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 D="gui/$(id -u)"
 
@@ -21,8 +22,8 @@ die() { printf '\033[1;31m✗\033[0m %s\n' "$*" >&2; exit 1; }
 
 if [ "${1:-}" = "--uninstall" ]; then
   launchctl bootout "$D/$LABEL" 2>/dev/null || true
-  rm -rf "$APP" "$PLIST" "$ROOT"
-  say "Sonde est désinstallée. Tes rapports et réglages restent dans « $SUP » : supprime ce dossier pour tout effacer."
+  rm -rf "$APP" "$OLDAPP" "$PLIST" "$ROOT"
+  say "Pouls est désinstallé. Tes rapports et réglages restent dans « $SUP » : supprime ce dossier pour tout effacer."
   exit 0
 fi
 
@@ -45,7 +46,7 @@ fi
 NODE="$ROOT/node/bin/node"
 
 # ---------------------------------------------------------------- Sonde (paquet signé)
-say "Téléchargement de la dernière version de Sonde"
+say "Téléchargement de la dernière version de Pouls"
 curl -fsSL -H 'accept: application/vnd.github+json' "https://api.github.com/repos/$REPO/releases/latest" -o "$TMP/rel.json"
 VER="$("$NODE" -p 'JSON.parse(require("fs").readFileSync(process.argv[1])).tag_name.replace(/^v/,"")' "$TMP/rel.json")"
 URL="https://github.com/$REPO/releases/download/v$VER/sonde-app-$VER.json"
@@ -80,21 +81,22 @@ launchctl bootout "$D/$LABEL" 2>/dev/null || true
 launchctl bootstrap "$D" "$PLIST"
 
 # ---------------------------------------------------------------- application (fenêtre)
-rm -rf "$APP"; mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+rm -rf "$APP" "$OLDAPP"; mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cat > "$APP/Contents/Info.plist" <<PL
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
-<key>CFBundleName</key><string>Sonde</string><key>CFBundleDisplayName</key><string>Sonde</string>
-<key>CFBundleIdentifier</key><string>$LABEL.app</string><key>CFBundleExecutable</key><string>Sonde</string>
+<key>CFBundleName</key><string>Pouls</string><key>CFBundleDisplayName</key><string>Pouls</string>
+<key>CFBundleIdentifier</key><string>$LABEL.app</string><key>CFBundleExecutable</key><string>Pouls</string>
 <key>CFBundleIconFile</key><string>icon</string><key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleShortVersionString</key><string>$VER</string><key>LSMinimumSystemVersion</key><string>11.0</string>
 </dict></plist>
 PL
 [ -f "$ROOT/versions/$VER/assets/icon.icns" ] && cp "$ROOT/versions/$VER/assets/icon.icns" "$APP/Contents/Resources/icon.icns"
-"$NODE" -e 'process.stdout.write(require(process.argv[1]).mac())' "$ROOT/versions/$VER/lib/launchers.js" > "$APP/Contents/MacOS/Sonde"
-chmod 755 "$APP/Contents/MacOS/Sonde"
+"$NODE" -e 'process.stdout.write(require(process.argv[1]).mac())' "$ROOT/versions/$VER/lib/launchers.js" > "$APP/Contents/MacOS/Pouls"
+chmod 755 "$APP/Contents/MacOS/Pouls"
 
-say "Sonde $VER est installée : ~/Applications/Sonde.app"
+touch "$APP"; /System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f "$APP" 2>/dev/null || true
+say "Pouls $VER est installé : ~/Applications/Pouls.app"
 say "Les mises à jour suivantes s'installent toutes seules (Réglages → Mises à jour)."
 open "$APP"

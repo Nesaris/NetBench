@@ -3,11 +3,12 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Sonde</title>
+<title>Pouls</title>
 <meta name="description" content="Banc de test du réseau de la maison : ping, débit, charge et ce que voit la box (Freebox, Livebox, SFR Box, Bbox).">
+<link rel="icon" href="/static/mark.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/static/fonts.css">
 <style>
-/* Sonde — instrument de mesure.
+/* Pouls — instrument de mesure.
    Accent : cyan « trace d'oscilloscope », réservé aux mesures en cours et à l'action principale.
    Typo : IBM Plex Sans (interface) + IBM Plex Mono (toutes les valeurs mesurées, chiffres tabulaires).
    Mise en page : un rack d'appareils à gauche, une zone de lecture à droite. */
@@ -408,8 +409,8 @@ body.setup #bSet{display:none}
 <div class="app">
   <header>
     <div class="brand">
-      <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><rect x="1" y="1" width="20" height="20" rx="5" fill="none" stroke="#30353c"/><path d="M4 13h3l2-6 3 9 2-5h4" fill="none" stroke="#5cc8e8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
-      Sonde
+      <svg width="24" height="24" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="2" y="2" width="60" height="60" rx="15" fill="#15191e" stroke="#2b3138" stroke-width="1.5"/><circle cx="44" cy="32" r="8.5" fill="none" stroke="#5cc8e8" stroke-opacity=".35" stroke-width="2"/><path d="M13 32h9.5l3.5-9 4.5 18 3.5-9H44" fill="none" stroke="#5cc8e8" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="44" cy="32" r="3" fill="#e9f8fc"/></svg>
+      Pouls
     </div>
     <span class="pill" id="pFibre"><span class="dot"></span>Fibre…</span>
     <span class="pill" id="pLive" title="Liaison avec le moteur de mesure"><span class="dot"></span>Hors ligne</span>
@@ -417,7 +418,7 @@ body.setup #bSet{display:none}
       <span>Box reçoit<b id="hDown">—</b></span>
       <span>Box envoie<b id="hUp">—</b></span>
     </div>
-    <span class="chip" id="updChip" style="display:none;cursor:pointer" title="Une nouvelle version de Sonde est disponible"></span>
+    <span class="chip" id="updChip" style="display:none;cursor:pointer" title="Une nouvelle version de Pouls est disponible"></span>
     <button class="btn ghost sm" id="bSet" title="Box, opérateur et mises à jour">Réglages</button>
     <button class="btn ghost sm" id="bQuit" title="Arrête les tests et ferme le moteur">Quitter</button>
   </header>
@@ -788,8 +789,8 @@ body.setup #bSet{display:none}
           <div class="setrow"><button class="btn" id="setChange">Changer d'opérateur ou de box</button><button class="btn ghost" id="setBack">Retour</button></div>
         </div></div></div>
         <div class="panel" style="margin-top:14px" id="setModeP"><div class="panel-h"><h3>Où sont faites les mesures</h3><span class="sub" id="setModeSub"></span></div><div class="panel-b">
-          <label style="display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;margin:0 0 10px;cursor:pointer"><input type="radio" name="mode" value="remote" id="modeRemote" style="margin-top:4px"> <span><b>Par l'agent, en continu</b> (recommandé) : le serveur mesure tout le temps, même app fermée. Rien n'est faussé par le Wi‑Fi de cet ordinateur, et les graphiques et le journal des pics sont gardés : tu les retrouves en rouvrant Sonde.</span></label>
-          <label style="display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;margin:0 0 10px;cursor:pointer"><input type="radio" name="mode" value="local" id="modeLocal" style="margin-top:4px"> <span><b>Depuis cet ordinateur</b>, seulement quand Sonde est ouverte.</span></label>
+          <label style="display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;margin:0 0 10px;cursor:pointer"><input type="radio" name="mode" value="remote" id="modeRemote" style="margin-top:4px"> <span><b>Par l'agent, en continu</b> (recommandé) : le serveur mesure tout le temps, même app fermée. Rien n'est faussé par le Wi‑Fi de cet ordinateur, et les graphiques et le journal des pics sont gardés : tu les retrouves en rouvrant Pouls.</span></label>
+          <label style="display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;margin:0 0 10px;cursor:pointer"><input type="radio" name="mode" value="local" id="modeLocal" style="margin-top:4px"> <span><b>Depuis cet ordinateur</b>, seulement quand Pouls est ouvert.</span></label>
           <p class="note" id="setModeNote" style="font-size:var(--t-xs);margin:4px 0 0"></p>
           <div id="sessBox" style="display:none;margin-top:14px"><div class="lb" style="font-size:var(--t-sm);color:var(--text-2);margin-bottom:6px">Appareils connectés au serveur</div><div class="rows" id="sessList"></div>
             <div class="setrow"><button class="btn sm" id="sessOthers">Déconnecter tous les autres</button></div></div>
@@ -798,7 +799,7 @@ body.setup #bSet{display:none}
           <p class="note" id="updTxt" style="margin:0 0 10px"></p>
           <label class="setrow" style="margin:0 0 10px"><input type="checkbox" id="updAuto"> Installer les mises à jour automatiquement (vérifiées toutes les 6 h)</label>
           <div class="setrow"><button class="btn" id="updCheck">Vérifier maintenant</button><button class="btn primary" id="updApply" style="display:none">Installer et redémarrer</button></div>
-          <p class="note" style="font-size:var(--t-xs);margin:8px 0 0">Chaque version est signée par le mainteneur. Sonde vérifie la signature avant d'installer quoi que ce soit : une version modifiée par quelqu'un d'autre est refusée.</p>
+          <p class="note" style="font-size:var(--t-xs);margin:8px 0 0">Chaque version est signée par le mainteneur. Pouls vérifie la signature avant d'installer quoi que ce soit : une version modifiée par quelqu'un d'autre est refusée.</p>
         </div></div>
       </div>
     </section>
@@ -826,7 +827,7 @@ body.setup #bSet{display:none}
     <h2 id="nT">Noms automatiques</h2>
     <p>Noms trouvés à partir de ce que chaque appareil annonce sur le réseau (UPnP, mDNS, DHCP) ou de son fabricant. Modifie‑les si besoin, coche ceux à envoyer à la box : ils seront visibles partout, Freebox OS compris.</p>
     <div style="overflow:auto;margin-top:12px;border:1px solid var(--line);border-radius:var(--r)"><table class="t" id="nTable"><thead><tr><th style="width:28px"></th><th>Nom actuel</th><th style="text-align:left">Nom proposé</th><th>Trouvé via</th><th>Modèle détecté</th></tr></thead><tbody></tbody></table></div>
-    <label class="chk" style="margin-top:12px"><input type="checkbox" id="nAuto"> Nommer automatiquement les nouveaux appareils dès leur connexion (seulement ceux sans vrai nom, tant que Sonde est ouverte)</label>
+    <label class="chk" style="margin-top:12px"><input type="checkbox" id="nAuto"> Nommer automatiquement les nouveaux appareils dès leur connexion (seulement ceux sans vrai nom, tant que Pouls est ouvert)</label>
     <div class="acts"><span class="sub" id="nInfo" style="margin-right:auto;font-size:var(--t-xs);color:var(--text-3);align-self:center"></span><button class="btn" id="nNo">Fermer</button><button class="btn primary" id="nYes">Renommer sur la box</button></div>
   </div>
 </div>
@@ -1086,7 +1087,7 @@ async function loadRange() {
     else liveSrcText();
   } catch { }
 }
-function liveSrcText() { $('#liveSrc').textContent = MODE.active ? `Mesures faites en continu par l'agent (${MODE.agent ? new URL(MODE.agent).hostname : ''}) · rien n'est faussé par le Wi‑Fi de cet ordinateur` : 'Mesures faites depuis cet ordinateur, seulement quand Sonde est ouvert'; }
+function liveSrcText() { $('#liveSrc').textContent = MODE.active ? `Mesures faites en continu par l'agent (${MODE.agent ? new URL(MODE.agent).hostname : ''}) · rien n'est faussé par le Wi‑Fi de cet ordinateur` : 'Mesures faites depuis cet ordinateur, seulement quand Pouls est ouvert'; }
 $$('#liveRange button').forEach(b => b.onclick = () => { RANGE = +b.dataset.r; store.set('liveRange', RANGE); loadRange(); });
 
 /* ============ PING ============ */
@@ -1551,7 +1552,7 @@ async function svcInit() {
   let st; try { st = await api('/api/agent/status'); } catch (e) { return gate(`<h2>Moteur injoignable</h2><p>${esc(e.message)}</p>`); }
   if (!st.configured) return gate(`<h2>Installer l'agent DNS</h2><p>Cet onglet montre quels services (Netflix, YouTube, jeux…) utilise chaque appareil, avec leur logo, et permet de bloquer un site ou un service. Il faut pour ça un petit serveur DNS, « l'agent ». Choisis où l'installer :</p>
     <div class="isp" style="margin:12px 0">
-      <div class="panel" style="padding:12px 14px"><b>Sur cet ordinateur</b> <span class="chip">le plus simple</span><p class="note" style="margin:6px 0">Actif seulement quand Sonde est ouvert. Sur chaque appareil à surveiller, mets en DNS 1 l'adresse de cet ordinateur et en DNS 2 celle de la box : quand Sonde est fermé, l'appareil repasse tout seul par la box.</p><button class="btn" id="agLocal">Activer sur cet ordinateur</button></div>
+      <div class="panel" style="padding:12px 14px"><b>Sur cet ordinateur</b> <span class="chip">le plus simple</span><p class="note" style="margin:6px 0">Actif seulement quand Pouls est ouvert. Sur chaque appareil à surveiller, mets en DNS 1 l'adresse de cet ordinateur et en DNS 2 celle de la box : quand Pouls est fermé, l'appareil repasse tout seul par la box.</p><button class="btn" id="agLocal">Activer sur cet ordinateur</button></div>
       <div class="panel" style="padding:12px 14px"><b>Docker</b> (NAS, serveur, Raspberry Pi)<p class="note" style="margin:6px 0">Tourne en continu. Une seule commande sur la machine :</p><code class="mono" style="display:block;user-select:all;font-size:var(--t-xs);background:var(--panel-2);padding:8px;border-radius:var(--r)">curl -fsSL https://raw.githubusercontent.com/Nesaris/sonde/main/agent/install.sh | sudo bash -s -- --docker</code></div>
       <div class="panel" style="padding:12px 14px"><b>Debian / Ubuntu Server</b>${st.box === 'freebox' ? ' (ou VM Debian sur la Freebox)' : ''}<p class="note" style="margin:6px 0">Tourne en continu, comme un service système. Une seule commande :</p><code class="mono" style="display:block;user-select:all;font-size:var(--t-xs);background:var(--panel-2);padding:8px;border-radius:var(--r)">curl -fsSL https://raw.githubusercontent.com/Nesaris/sonde/main/agent/install.sh | sudo bash</code></div>
     </div>
@@ -1888,36 +1889,36 @@ async function openWizard(step) {
 function wizFrame(n, main) {
   $('#wiz').innerHTML = `<div class="ob">
     <aside class="ob-side">
-      <div class="ob-brand"><svg width="34" height="34" viewBox="0 0 22 22" aria-hidden="true"><rect x="1" y="1" width="20" height="20" rx="5" fill="none" stroke="#30353c"/><path d="M4 13h3l2-6 3 9 2-5h4" fill="none" stroke="#5cc8e8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>Sonde</b><span>Banc de test du réseau de la maison</span></div></div>
+      <div class="ob-brand"><svg width="38" height="38" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="2" y="2" width="60" height="60" rx="15" fill="#15191e" stroke="#2b3138" stroke-width="1.5"/><circle cx="44" cy="32" r="8.5" fill="none" stroke="#5cc8e8" stroke-opacity=".35" stroke-width="2"/><path d="M13 32h9.5l3.5-9 4.5 18 3.5-9H44" fill="none" stroke="#5cc8e8" stroke-width="3.6" stroke-linecap="round" stroke-linejoin="round"/><circle cx="44" cy="32" r="3" fill="#e9f8fc"/></svg><div><b>Pouls</b><span>Banc de test du réseau de la maison</span></div></div>
       <ol class="ob-steps">${STEPS.map((l, i) => `<li class="${i < n ? 'done' : i === n ? 'on' : ''}"><span>${i < n ? '✓' : i + 1}</span>${l}</li>`).join('')}</ol>
-      <p class="ob-why">Sonde mesure le ping de chaque appareil, le débit de la fibre et les coupures Wi‑Fi, et garde l'historique pour comparer avant / après un changement.</p>
-      <div class="ob-foot">${IC_LOCK}<span>Tout reste chez toi. Sonde n'envoie rien sur Internet et garde tes codes dans le coffre de l'ordinateur.</span></div>
+      <p class="ob-why">Pouls mesure le ping de chaque appareil, le débit de la fibre et les coupures Wi‑Fi, et garde l'historique pour comparer avant / après un changement.</p>
+      <div class="ob-foot">${IC_LOCK}<span>Tout reste chez toi. Pouls n'envoie rien sur Internet et garde tes codes dans le coffre de l'ordinateur.</span></div>
     </aside>
     <section class="ob-main">${main}</section></div>`;
 }
 function renderWizard() {
   const su = WZ.setup;
   if (WZ.step === 'auto') {
-    wizFrame(0, `<div class="ob-split">${boxPic(null, true).replace('ob-ph big', 'ob-ph big scan')}<div><h1>Recherche de ta box…</h1><p class="ob-lead">Sonde interroge la passerelle de ton réseau${su.gateway ? ` (${esc(su.gateway)})` : ''} pour reconnaître l'opérateur et le modèle. Ça prend quelques secondes.</p><div class="ob-wait"><i></i><i></i><i></i></div>
+    wizFrame(0, `<div class="ob-split">${boxPic(null, true).replace('ob-ph big', 'ob-ph big scan')}<div><h1>Recherche de ta box…</h1><p class="ob-lead">Pouls interroge la passerelle de ton réseau${su.gateway ? ` (${esc(su.gateway)})` : ''} pour reconnaître l'opérateur et le modèle. Ça prend quelques secondes.</p><div class="ob-wait"><i></i><i></i><i></i></div>
       <div class="setrow" style="margin-top:18px"><button class="btn ghost" id="wzManual">Choisir mon opérateur moi-même</button></div></div></div>`);
     let skip = false;
     $('#wzManual').onclick = () => { skip = true; WZ.step = 'isp'; WZ.note = null; renderWizard(); };
     api('/api/setup/detect', {}).then(d => {
       if (skip || WZ.step !== 'auto') return;
-      if (d.box === 'generic') { WZ.step = 'isp'; WZ.note = 'Sonde n\'a pas reconnu ta box toute seule. Choisis ton opérateur.'; }
+      if (d.box === 'generic') { WZ.step = 'isp'; WZ.note = 'Pouls n\'a pas reconnu ta box toute seule. Choisis ton opérateur.'; }
       else { WZ.det = d; WZ.isp = d.isp; WZ.step = 'found'; WZ.auto = true; }
       renderWizard();
     }).catch(() => { if (!skip) { WZ.step = 'isp'; WZ.note = 'Recherche automatique impossible. Choisis ton opérateur.'; renderWizard(); } });
     return;
   }
   if (WZ.step === 'isp') {
-    wizFrame(0, `<h1>Quel est ton opérateur ?</h1><p class="ob-lead">${WZ.note ? `<b>${esc(WZ.note)}</b> ` : ''}Sonde se connecte à ta box pour lister les appareils, lire le signal Wi‑Fi et le débit de la fibre. Le ping, les tests de débit et les rapports marchent avec toutes les box.</p>
+    wizFrame(0, `<h1>Quel est ton opérateur ?</h1><p class="ob-lead">${WZ.note ? `<b>${esc(WZ.note)}</b> ` : ''}Pouls se connecte à ta box pour lister les appareils, lire le signal Wi‑Fi et le débit de la fibre. Le ping, les tests de débit et les rapports marchent avec toutes les box.</p>
       <div class="ob-isps">${su.isps.map(i => `<button class="ob-isp" data-isp="${esc(i.id)}" aria-pressed="${WZ.isp === i.id}">
         <div class="ob-logo">${i.logo ? `<img src="/api/brand/logo?k=${encodeURIComponent(i.id)}" alt="${esc(i.label)}" data-fb="remove">` : IC_NET}</div>
         <div class="ob-isp-b"><div class="ob-isp-t"><b>${esc(i.label)}</b></div>
         <span class="chip ${i.level === 'complet' ? 'ok' : ''}">${esc(i.level === 'complet' ? 'complet' : i.level === 'expérimental' ? 'expérimental' : 'ping et débit')}</span>
         <div class="m">${esc(i.models)}</div></div></button>`).join('')}</div>
-      <p class="ob-note">« Expérimental » : écrit d'après l'API de la box, pas encore vérifié sur toutes les versions. En cas de souci, Sonde passe en mode générique (ping et débit).</p>
+      <p class="ob-note">« Expérimental » : écrit d'après l'API de la box, pas encore vérifié sur toutes les versions. En cas de souci, Pouls passe en mode générique (ping et débit).</p>
       <div class="setrow"><button class="btn ghost" id="wzAuto">Relancer la recherche automatique</button></div>`);
     $$('#wiz [data-isp]').forEach(b => b.onclick = () => { WZ.isp = b.dataset.isp; WZ.auto = false; WZ.step = 'detect'; renderWizard(); });
     $('#wzAuto').onclick = () => { WZ.step = 'auto'; WZ.note = null; renderWizard(); };
@@ -1925,17 +1926,17 @@ function renderWizard() {
   }
   const want = su.isps.find(i => i.id === WZ.isp) || {};
   if (WZ.step === 'detect') {
-    wizFrame(0, `<div class="ob-split">${boxPic(null, true).replace('ob-ph big', 'ob-ph big scan')}<div><h1>Recherche de ta box…</h1><p class="ob-lead">Sonde interroge la passerelle de ton réseau${su.gateway ? ` (${esc(su.gateway)})` : ''} pour reconnaître le modèle.</p><div class="ob-wait"><i></i><i></i><i></i></div></div></div>`);
+    wizFrame(0, `<div class="ob-split">${boxPic(null, true).replace('ob-ph big', 'ob-ph big scan')}<div><h1>Recherche de ta box…</h1><p class="ob-lead">Pouls interroge la passerelle de ton réseau${su.gateway ? ` (${esc(su.gateway)})` : ''} pour reconnaître le modèle.</p><div class="ob-wait"><i></i><i></i><i></i></div></div></div>`);
     api('/api/setup/detect', { isp: WZ.isp }).then(d => { WZ.det = d; WZ.step = 'found'; renderWizard(); }).catch(e => { $('.ob-main').insertAdjacentHTML('beforeend', `<p class="c-bad">${esc(e.message)}</p>`); });
     return;
   }
   if (WZ.step === 'found') {
     const d = WZ.det; WZ.isp = WZ.isp || d.isp; const want = su.isps.find(i => i.id === WZ.isp) || {}, lbl = { freebox: 'Freebox', livebox: 'Livebox', bbox: 'Bbox', sfr: 'SFR Box', generic: 'box' }[d.box];
     let head, txt, ok = true;
-    if (d.box === 'generic' && WZ.isp !== 'other') { ok = false; head = 'Box non reconnue'; txt = `Sonde n'a pas trouvé de box ${esc(want.label)} compatible à ${esc(d.host || '—')}. Tu peux continuer en mode générique (ping, débit, charge et rapports, sans la liste détaillée des appareils) ou donner l'adresse de ta box.`; }
-    else if (d.box === 'generic') { head = 'Mode générique'; txt = 'Sonde utilisera les mesures faites depuis cet ordinateur et les appareils qu\'il voit sur le réseau.'; }
-    else if (!d.expected && !WZ.auto) { head = `${esc(d.photoLabel || d.model || lbl)} trouvée`; txt = `Tu as choisi ${esc(want.label)}, mais la box de ce réseau est une <b>${esc(d.photoLabel || d.model || lbl)}</b>. Sonde va utiliser celle-ci.`; }
-    else { head = `C'est bien ta ${esc(d.photoLabel || d.model || lbl)} ?`; txt = `Sonde a trouvé cette box sur ton réseau. Si c'est la bonne, elle s'y connecte.${d.photo ? '' : ' (La marque ne publie pas de photo propre de ce modèle : illustration.)'}`; }
+    if (d.box === 'generic' && WZ.isp !== 'other') { ok = false; head = 'Box non reconnue'; txt = `Pouls n'a pas trouvé de box ${esc(want.label)} compatible à ${esc(d.host || '—')}. Tu peux continuer en mode générique (ping, débit, charge et rapports, sans la liste détaillée des appareils) ou donner l'adresse de ta box.`; }
+    else if (d.box === 'generic') { head = 'Mode générique'; txt = 'Pouls utilisera les mesures faites depuis cet ordinateur et les appareils qu\'il voit sur le réseau.'; }
+    else if (!d.expected && !WZ.auto) { head = `${esc(d.photoLabel || d.model || lbl)} trouvée`; txt = `Tu as choisi ${esc(want.label)}, mais la box de ce réseau est une <b>${esc(d.photoLabel || d.model || lbl)}</b>. Pouls va utiliser celle-ci.`; }
+    else { head = `C'est bien ta ${esc(d.photoLabel || d.model || lbl)} ?`; txt = `Pouls a trouvé cette box sur ton réseau. Si c'est la bonne, Pouls s'y connecte.${d.photo ? '' : ' (La marque ne publie pas de photo propre de ce modèle : illustration.)'}`; }
     const yes = ok && d.box !== 'generic';
     wizFrame(0, `<div class="ob-split">${boxPic(d.box === 'generic' ? null : d.photo, true)}<div>
       <div class="ob-found ${ok ? 'ok' : 'warn'}">${ok ? IC_OK : ''}<span>${ok ? 'Box détectée' : 'Pas de box compatible'}</span></div>
@@ -1957,9 +1958,9 @@ function renderWizard() {
     if (a.ok || a.kind === 'none') return wizardDone();
     const back = '<button class="btn ghost" id="wzBack">Changer d\'opérateur</button>';
     if (a.kind === 'button') {
-      wizFrame(1, `<div class="ob-split">${pic}<div><h1>Autoriser Sonde sur la ${esc(lbl)}</h1>
-        <ol class="ob-howto"><li>Clique sur « Demander l'autorisation ».</li><li>Sur l'écran de la box, un message « Sonde » apparaît.</li><li>Valide avec la flèche droite, dans les 90 secondes.</li></ol>
-        <p class="ob-lead">Sonde reçoit un jeton gardé dans le coffre de cet ordinateur (trousseau sur Mac, chiffrement Windows). Tu peux le retirer à tout moment dans Freebox OS.</p>
+      wizFrame(1, `<div class="ob-split">${pic}<div><h1>Autoriser Pouls sur la ${esc(lbl)}</h1>
+        <ol class="ob-howto"><li>Clique sur « Demander l'autorisation ».</li><li>Sur l'écran de la box, un message « Pouls » apparaît.</li><li>Valide avec la flèche droite, dans les 90 secondes.</li></ol>
+        <p class="ob-lead">Pouls reçoit un jeton gardé dans le coffre de cet ordinateur (trousseau sur Mac, chiffrement Windows). Tu peux le retirer à tout moment dans Freebox OS.</p>
         <div class="setrow"><button class="btn primary" id="bAuth">Demander l'autorisation</button>${back}</div><p id="authSt" class="mono ob-st"></p></div></div>`);
       $('#bAuth').onclick = async () => { $('#bAuth').disabled = true; $('#authSt').textContent = 'Regarde l\'écran de la box et valide…'; try { await api('/api/setup/auth', {}); } catch (e) { $('#authSt').textContent = e.message; $('#bAuth').disabled = false; } };
     } else {
@@ -1980,7 +1981,7 @@ async function wizardDone() {
   const L = { signal: 'signal Wi‑Fi', perDeviceRate: 'trafic par appareil', wanRate: 'débit de la fibre', rename: 'noms des appareils', block: 'blocage d\'appareil', repeater: 'répéteur' };
   wizFrame(2, `<div class="ob-split">${boxPic(su.photo, true)}<div>
     <div class="ob-found ok">${IC_OK}<span>Connectée</span></div>
-    <h1>C'est prêt</h1><p class="ob-lead">Sonde est reliée à ta ${esc(su.photoLabel || su.config?.model || su.label || 'box')}. Ce qu'elle permet :</p>
+    <h1>C'est prêt</h1><p class="ob-lead">Pouls est relié à ta ${esc(su.photoLabel || su.config?.model || su.label || 'box')}. Ce qu'elle permet :</p>
     <div class="flist">${Object.entries(L).map(([k, l]) => `<span class="chip ${f[k] ? 'ok' : ''}">${f[k] ? '' : 'pas de '}${l}</span>`).join('')}</div>
     <div class="setrow" style="margin-top:18px"><button class="btn primary" id="wzGo">Ouvrir le tableau de bord</button></div></div></div>`);
   await applyFeatures();
@@ -1991,12 +1992,12 @@ function onAuth(a) {
   if ($('#authSt')) $('#authSt').textContent = t[a.status] || a.status;
   if (a.status === 'granted') wizardDone(); else if (a.status !== 'pending' && $('#bAuth')) $('#bAuth').disabled = false;
 }
-// Connexion au serveur Sonde (agent) : une seule fois, la session est ensuite prolongée à chaque utilisation.
+// Connexion au serveur Pouls (agent) : une seule fois, la session est ensuite prolongée à chaque utilisation.
 function openAgentLogin(info = {}) {
   if (openAgentLogin.on) return; openAgentLogin.on = true;
   $('nav.tabs').style.display = 'none'; show('auth');
   const host = info.agent ? new URL(info.agent).hostname : 'serveur';
-  $('#wiz').innerHTML = `<h1>Connexion au serveur Sonde</h1><p>Les mesures sont faites par le serveur Sonde (${esc(host)}). Connecte-toi avec l'identifiant et le mot de passe choisis à son installation. Tu ne le feras qu'une fois sur cet ordinateur : la connexion reste active tant que tu utilises Sonde au moins une fois par an. Sans ces codes, personne ne peut lire ni piloter le serveur.</p>
+  $('#wiz').innerHTML = `<h1>Connexion au serveur Pouls</h1><p>Les mesures sont faites par le serveur Pouls (${esc(host)}). Connecte-toi avec l'identifiant et le mot de passe choisis à son installation. Tu ne le feras qu'une fois sur cet ordinateur : la connexion reste active tant que tu utilises Pouls au moins une fois par an. Sans ces codes, personne ne peut lire ni piloter le serveur.</p>
     <div class="fld"><label for="alU">Identifiant</label><input id="alU" autocomplete="username" value="${esc(info.user || '')}"></div>
     <div class="fld"><label for="alP">Mot de passe</label><input id="alP" type="password" autocomplete="current-password"></div>
     <div class="setrow"><button class="btn primary" id="alGo">Se connecter</button><button class="btn ghost" id="alLocal">Mesurer depuis cet ordinateur à la place</button></div><p id="alSt" class="mono" style="font-size:var(--t-sm)"></p>`;
@@ -2029,7 +2030,7 @@ async function openSettings() {
   const c = su.config || {}, f = su.features || {};
   $('#setBoxSub').textContent = (su.isps.find(i => i.id === c.isp) || {}).label || '';
   $('#setBoxPh').innerHTML = boxPic(su.photo);
-  $('#setBox').innerHTML = kv([['Box', c.model || su.label], ['Adresse', c.host], ['Connexion', su.auth?.ok ? 'autorisée' : 'à faire'], ['Ordinateur', su.osLabel + ' · Sonde ' + su.version]]);
+  $('#setBox').innerHTML = kv([['Box', c.model || su.label], ['Adresse', c.host], ['Connexion', su.auth?.ok ? 'autorisée' : 'à faire'], ['Ordinateur', su.osLabel + ' · Pouls ' + su.version]]);
   const L = { signal: 'signal Wi‑Fi', perDeviceRate: 'trafic par appareil', wanRate: 'débit de la fibre', rename: 'renommer', block: 'bloquer un appareil', repeater: 'répéteur', ports: 'ports' };
   $('#setFeat').innerHTML = Object.entries(L).map(([k, l]) => `<span class="chip ${f[k] ? 'ok' : ''}">${f[k] ? '' : 'pas de '}${l}</span>`).join('') + (f.experimental ? '<span class="chip warn">prise en charge expérimentale</span>' : '');
   loadUpdate(); loadModePanel();
@@ -2057,14 +2058,14 @@ async function loadUpdate() {
   const u = await api('/api/update').catch(() => null); if (!u) return;
   $('#updAuto').checked = !!u.auto;
   $('#updSub').textContent = 'version ' + u.current;
-  const T = { idle: 'Pas encore vérifié.', checking: 'Vérification…', uptodate: 'Sonde est à jour.', available: `Version ${u.latest?.version} disponible.`, downloading: 'Téléchargement et vérification de la signature…', restarting: 'Installée, redémarrage…', error: 'Erreur : ' + (u.error || '') };
+  const T = { idle: 'Pas encore vérifié.', checking: 'Vérification…', uptodate: 'Pouls est à jour.', available: `Version ${u.latest?.version} disponible.`, downloading: 'Téléchargement et vérification de la signature…', restarting: 'Installée, redémarrage…', error: 'Erreur : ' + (u.error || '') };
   $('#updTxt').textContent = (T[u.state] || u.state) + (!u.installed ? ' (version de développement : installation automatique désactivée)' : '');
   $('#updApply').style.display = u.state === 'available' && u.installed ? '' : 'none';
   const chip = $('#updChip'); if (u.state === 'available') { chip.textContent = 'Mise à jour ' + u.latest.version; chip.style.display = ''; } else chip.style.display = 'none';
 }
 $('#bSet').onclick = openSettings; $('#updChip').onclick = openSettings;
 $('#setBack').onclick = () => { $('nav.tabs').style.display = ''; show('live'); };
-$('#setChange').onclick = async () => { if (!(await ask('Changer de box ?', 'Sonde va oublier la connexion à la box actuelle et relancer l\'assistant. Tes rapports et ton historique sont gardés.', 'Changer'))) return; await api('/api/setup/reset', {}); WZ.isp = null; openWizard('isp'); };
+$('#setChange').onclick = async () => { if (!(await ask('Changer de box ?', 'Pouls va oublier la connexion à la box actuelle et relancer l\'assistant. Tes rapports et ton historique sont gardés.', 'Changer'))) return; await api('/api/setup/reset', {}); WZ.isp = null; openWizard('isp'); };
 $('#updAuto').onchange = e => api('/api/update/auto', { auto: e.target.checked }).then(loadUpdate);
 $('#updCheck').onclick = async () => { $('#updTxt').textContent = 'Vérification…'; await api('/api/update/check', {}).catch(e => toast(e.message, true)); loadUpdate(); };
 $('#updApply').onclick = async () => { $('#updTxt').textContent = 'Téléchargement et vérification de la signature…'; const r = await api('/api/update/apply', {}).catch(e => ({ ok: false, error: e.message })); if (!r.ok) return toast(r.error, true); $('#updTxt').textContent = `Version ${r.version} installée, redémarrage…`; setTimeout(() => location.reload(), 5000); };
@@ -2084,9 +2085,9 @@ function connect() {
   on('newdev', e => toast(e.renamed ? `Nouvel appareil détecté et nommé : ${e.renamed}` : `Nouvel appareil détecté : ${e.device}`));
   on('wping', onWping); on('wevent', e => { EV.unshift(e); renderEvents(); }); on('scan', onScan); on('ping', onPing); on('load', onLoad); on('loadEnd', onLoadEnd); on('full', onFull); on('fullEnd', onFullEnd); on('auth', onAuth);
   on('wanError', e => { if (/no_token|invalid_token|auth_failed/.test(e.code || '')) loadOverview(); });
-  on('update', () => loadUpdate()); on('updated', u => { toast(`Sonde a été mise à jour (version ${u.version}). Redémarrage…`); setTimeout(() => location.reload(), 6000); });
+  on('update', () => loadUpdate()); on('updated', u => { toast(`Pouls a été mis à jour (version ${u.version}). Redémarrage…`); setTimeout(() => location.reload(), 6000); });
 }
-$('#bQuit').onclick = async () => { await api('/api/quit', {}).catch(() => { }); document.body.innerHTML = '<div class="empty" style="padding-top:30vh">Sonde est fermée. Tu peux fermer cette fenêtre.</div>'; setTimeout(() => window.close(), 400); };
+$('#bQuit').onclick = async () => { await api('/api/quit', {}).catch(() => { }); document.body.innerHTML = '<div class="empty" style="padding-top:30vh">Pouls est fermé. Tu peux fermer cette fenêtre.</div>'; setTimeout(() => window.close(), 400); };
 
 { const t = location.hash.slice(1) || store.get('tab', 'live'); show(['live', 'devs', 'svc', 'scan', 'ping', 'load', 'full', 'cmp', 'hist'].includes(t) ? t : 'live'); }
 applyFeatures().then(loadUpdate); loadNote(); loadOverview(); connect(); loop(); setTimeout(loadWatch, 4000); setInterval(() => { if (!cCons.series.size || cCons.series.size < 3) loadWatch(); }, 5000);

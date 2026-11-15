@@ -1,4 +1,4 @@
-# Installe Sonde sur Windows 10/11 (ou le met à jour ; -Uninstall pour le désinstaller).
+# Installe Pouls (anciennement Sonde) sur Windows 10/11 (ou le met à jour ; -Uninstall pour le désinstaller).
 #   irm https://raw.githubusercontent.com/Nesaris/sonde/main/install/win.ps1 | iex
 # Rien n'est installé en dehors de ton profil, aucun droit administrateur n'est demandé.
 # Node.js vient de nodejs.org (empreinte SHA-256 vérifiée) et Sonde des releases GitHub
@@ -11,14 +11,15 @@ $ProgressPreference = 'SilentlyContinue'
 $Repo = if ($env:SONDE_REPO) { $env:SONDE_REPO } else { 'Nesaris/sonde' }
 $PubKey = 'MCowBQYDK2VwAyEAY03Xgj+jmh+tZbBD0cI+qQuVwLH+L6/0qAGwyCFflE4='
 $Root = Join-Path $env:LOCALAPPDATA 'Sonde\app'
-$StartMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Sonde.lnk'
-$Desktop = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Sonde.lnk'
+$StartMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Pouls.lnk'
+$Desktop = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Pouls.lnk'
+$Old = @((Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Sonde.lnk'), (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Sonde.lnk'), (Join-Path $Root 'Sonde.vbs'))
 function Say($m) { Write-Host "› $m" -ForegroundColor Cyan }
 
 if ($Uninstall) {
   Get-CimInstance Win32_Process -Filter "Name='node.exe'" | Where-Object { $_.CommandLine -like "*$Root*" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
-  Remove-Item -Recurse -Force $Root, $StartMenu, $Desktop -ErrorAction SilentlyContinue
-  Say "Sonde est désinstallée. Tes rapports et réglages restent dans $env:APPDATA\Sonde (supprime ce dossier pour tout effacer)."
+  Remove-Item -Recurse -Force (@($Root, $StartMenu, $Desktop) + $Old) -ErrorAction SilentlyContinue
+  Say "Pouls est désinstallé. Tes rapports et réglages restent dans $env:APPDATA\Sonde (supprime ce dossier pour tout effacer)."
   return
 }
 
@@ -47,7 +48,7 @@ try {
   $Node = Join-Path $Root 'node\node.exe'
 
   # ---------------------------------------------------------------- Sonde (paquet signé)
-  Say 'Téléchargement de la dernière version de Sonde'
+  Say 'Téléchargement de la dernière version de Pouls'
   $rel = Invoke-RestMethod -UseBasicParsing -Headers @{ accept = 'application/vnd.github+json' } "https://api.github.com/repos/$Repo/releases/latest"
   $ver = $rel.tag_name -replace '^v', ''
   $url = "https://github.com/$Repo/releases/download/v$ver/sonde-app-$ver.json"
@@ -75,14 +76,14 @@ fs.rmSync(dest,{recursive:true,force:true}); fs.renameSync(tmp,dest);
   # ---------------------------------------------------------------- lanceur (moteur caché + fenêtre Edge)
   $launchers = Join-Path $Root "versions\$ver\lib\launchers.js"
   $vbs = (& $Node -e "process.stdout.write(require(process.argv[1]).win(process.argv[2],process.argv[3],process.argv[4]))" $launchers $Root $Node (Join-Path $env:APPDATA 'Sonde')) -join "`r`n"
-  $vbsFile = Join-Path $Root 'Sonde.vbs'; Set-Content -Path $vbsFile -Value $vbs -Encoding Unicode
+  $vbsFile = Join-Path $Root 'Pouls.vbs'; Remove-Item -Force $Old -ErrorAction SilentlyContinue; Set-Content -Path $vbsFile -Value $vbs -Encoding Unicode
   $ws = New-Object -ComObject WScript.Shell
   foreach ($lnk in @($StartMenu, $Desktop)) {
     $s = $ws.CreateShortcut($lnk); $s.TargetPath = "$env:WINDIR\System32\wscript.exe"; $s.Arguments = "`"$vbsFile`""
     $ico = Join-Path $Root "versions\$ver\assets\icon.ico"; if (Test-Path $ico) { $s.IconLocation = $ico }
-    $s.Description = 'Sonde : tests du réseau de la maison'; $s.Save()
+    $s.Description = 'Pouls : tests du réseau de la maison'; $s.Save()
   }
-  Say "Sonde $ver est installée (menu Démarrer et bureau)."
+  Say "Pouls $ver est installé (menu Démarrer et bureau)."
   Say 'Les mises à jour suivantes s''installent toutes seules (Réglages → Mises à jour).'
   Start-Process "$env:WINDIR\System32\wscript.exe" "`"$vbsFile`""
 } finally { Remove-Item -Recurse -Force $Tmp -ErrorAction SilentlyContinue }

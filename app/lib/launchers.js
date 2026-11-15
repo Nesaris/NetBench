@@ -1,5 +1,5 @@
 'use strict';
-// Lanceurs de la fenêtre Sonde (icône Mac, raccourci Windows). Ils sont réécrits à chaque démarrage de l'app :
+// Lanceurs de la fenêtre Pouls (icône Mac, raccourci Windows). Ils sont réécrits à chaque démarrage de l'app :
 // une mise à jour peut ainsi les corriger. La fenêtre s'ouvre avec la clé d'accès de l'interface (ui.key).
 const fs = require('node:fs');
 const os = require('node:os');
@@ -7,7 +7,7 @@ const path = require('node:path');
 
 function mac() {
   return `#!/bin/bash
-# Démarre le moteur s'il ne tourne pas, puis ouvre la fenêtre de Sonde avec sa clé d'accès.
+# Démarre le moteur s'il ne tourne pas, puis ouvre la fenêtre de Pouls avec sa clé d'accès.
 URL=http://127.0.0.1:47800
 LABEL=fr.nesaris.sonde
 SUP="$HOME/Library/Application Support/Sonde"
@@ -25,7 +25,7 @@ open "$URL/?k=$K"
 `;
 }
 function win(root, node, dataDir) {
-  return `' Démarre le moteur de Sonde s'il ne tourne pas, puis ouvre la fenêtre avec sa clé d'accès.
+  return `' Démarre le moteur de Pouls s'il ne tourne pas, puis ouvre la fenêtre avec sa clé d'accès.
 Set sh = CreateObject("WScript.Shell")
 Set fso = CreateObject("Scripting.FileSystemObject")
 Function Up()
@@ -56,11 +56,11 @@ function write(file, content, mode) {
 }
 function refresh({ root, node, dataDir, log }) {
   if (process.platform === 'darwin') {
-    const f = path.join(os.homedir(), 'Applications', 'Sonde.app', 'Contents', 'MacOS', 'Sonde');
-    if (write(f, mac(), 0o755)) log('lanceur Mac mis à jour');
+    // Pouls.app (ancien nom : Sonde.app, gardé tant que l'installeur n'est pas repassé)
+    for (const [a, e] of [['Pouls.app', 'Pouls'], ['Sonde.app', 'Sonde']]) if (write(path.join(os.homedir(), 'Applications', a, 'Contents', 'MacOS', e), mac(), 0o755)) log('lanceur Mac mis à jour');
   } else if (process.platform === 'win32') {
-    const f = path.join(root, 'Sonde.vbs');
-    if (fs.existsSync(f)) { const c = win(root, node, dataDir); try { if (fs.readFileSync(f, 'utf16le').replace(/^﻿/, '') !== c) { fs.writeFileSync(f, '﻿' + c, 'utf16le'); log('lanceur Windows mis à jour'); } } catch { } }
+    const f = [path.join(root, 'Pouls.vbs'), path.join(root, 'Sonde.vbs')].find(x => fs.existsSync(x));
+    if (f) { const c = win(root, node, dataDir); try { if (fs.readFileSync(f, 'utf16le').replace(/^﻿/, '') !== c) { fs.writeFileSync(f, '﻿' + c, 'utf16le'); log('lanceur Windows mis à jour'); } } catch { } }
   }
 }
 module.exports = { refresh, mac, win };

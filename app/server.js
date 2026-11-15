@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Sonde — banc de test du réseau de la maison (Freebox, Livebox, SFR Box, Bbox). Zéro dépendance.
+// Pouls (anciennement Sonde) — banc de test du réseau de la maison (Freebox, Livebox, SFR Box, Bbox). Zéro dépendance.
 // Écoute uniquement sur 127.0.0.1.
 'use strict';
 const http = require('node:http');
@@ -709,7 +709,7 @@ function proxyToAgent(req, res, p, search) {
   }, ur => {
     const fp = seenFp || ur.socket.getPeerCertificate()?.fingerprint256;
     if (c.fp && fp !== c.fp) { ur.resume(); return send(res, 495, { error: 'Certificat de l\'agent différent de celui mémorisé : connexion refusée.' }); }
-    if (ur.statusCode === 401) { ur.resume(); const { token, ...rest } = c; saveAgent(rest); return send(res, 401, { error: 'Connexion au serveur Sonde requise', needAgentLogin: true, agent: c.url, user: c.user || null }); }
+    if (ur.statusCode === 401) { ur.resume(); const { token, ...rest } = c; saveAgent(rest); return send(res, 401, { error: 'Connexion au serveur Pouls requise', needAgentLogin: true, agent: c.url, user: c.user || null }); }
     if (sse) { proxied++; lastClientSeen = now(); res.on('close', () => { proxied--; lastClientSeen = now(); up.destroy(); }); }
     res.writeHead(ur.statusCode, { ...SEC_HEADERS, 'content-type': ur.headers['content-type'] || 'application/json', 'cache-control': 'no-store', ...(/^\/api\/logo/.test(p) ? { 'content-security-policy': "default-src 'none'" } : {}), ...(sse ? { connection: 'keep-alive' } : {}) });
     ur.pipe(res);
@@ -887,7 +887,7 @@ async function handler(req, res, opts = {}) {
         const b = await body(req);
         if (!/^https:\/\/(192\.168|10\.|172\.(1[6-9]|2\d|3[01]))[\d.]*(:\d+)?\/?$/.test(b.url || '')) return send(res, 400, { error: 'Adresse attendue : https://IP-locale:8443' });
         const r = await agentReq('GET', '/api/health', null, { url: b.url, fp: null, noAuth: true });
-        if (!r.body.version) return send(res, 502, { error: 'Pas un agent Sonde à cette adresse.' });
+        if (!r.body.version) return send(res, 502, { error: 'Pas un agent Pouls à cette adresse.' });
         saveAgent({ url: b.url.replace(/\/$/, ''), fp: r.fp }); return send(res, 200, { ok: true, fp: r.fp });
       }
       if (sub === '/login' && req.method === 'POST') {
@@ -953,7 +953,7 @@ async function handler(req, res, opts = {}) {
       const b = await body(req);
       const mac = String(b.mac || '').toUpperCase();
       if (!/^([0-9A-F]{2}:){5}[0-9A-F]{2}$/.test(mac)) return send(res, 400, { error: 'Adresse MAC invalide' });
-      if (!F('block')) return send(res, 400, { error: 'Cette box ne permet pas à Sonde de bloquer un appareil.' });
+      if (!F('block')) return send(res, 400, { error: 'Cette box ne permet pas à Pouls de bloquer un appareil.' });
       const d = devCache.find(x => (x.mac || '').toUpperCase() === mac);
       if (d && d.via === 'cable' && box.id === 'freebox') return send(res, 400, { error: 'Appareil branché en câble : la box ne peut le bloquer que sur le Wi‑Fi.' });
       const agentIp = (() => { try { return new URL(agentCfg().url).hostname; } catch { return null; } })();
@@ -1011,7 +1011,7 @@ function shutdown(code = 0) {
 loadBox();
 if (HEADLESS) {
   // dans l'agent : pas de serveur HTTP propre, pas de mise à jour (l'agent a la sienne), jamais d'arrêt automatique
-  log(`moteur Sonde ${VERSION} en mode serveur`);
+  log(`moteur Pouls ${VERSION} en mode serveur`);
   module.exports = { handler, flush: flushJournal };
   process.on('SIGTERM', () => flushJournal());
 } else {
@@ -1023,5 +1023,5 @@ if (HEADLESS) {
   if (settings.localAgent) startLocalAgent().catch(e => log('agent local :', e.message));
   try { require('./lib/launchers').refresh({ root: path.dirname(path.dirname(__dirname)), node: process.execPath, dataDir: DATA_DIR, log }); } catch (e) { log('lanceur :', e.message); }
   updater.init({ version: VERSION, dataDir: DATA_DIR, appDir: __dirname, log, broadcast: (...a) => broadcast(...a), idle: () => !(load && load.running) && !(full && full.running) && !scanning });
-  server.listen(PORT, HOST, () => log(`Sonde ${VERSION} prête : http://${HOST}:${PORT}`));
+  server.listen(PORT, HOST, () => log(`Pouls ${VERSION} prêt : http://${HOST}:${PORT}`));
 }
