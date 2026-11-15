@@ -334,6 +334,7 @@ input.txt{height:34px;width:100%;border-radius:var(--r);border:1px solid var(--l
 .isp button[aria-pressed=true]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
 .isp b{font-weight:600}.isp .m{grid-column:1/-1;color:var(--text-3);font-size:var(--t-xs)}
 .gate .isp>div{min-width:0}.gate code{white-space:pre-wrap;word-break:break-all}
+.setph .ob-ph{height:130px;border-radius:10px;border:1px solid var(--line)}
 .wsteps{display:flex;gap:6px;margin-bottom:18px;color:var(--text-3);font-size:var(--t-xs)}
 .wsteps span{padding:3px 8px;border:1px solid var(--line);border-radius:99px}.wsteps span.on{color:var(--text);border-color:var(--accent)}
 .fld{display:grid;gap:6px;margin:0 0 12px}.fld label{font-size:var(--t-sm);color:var(--text-2)}
@@ -354,6 +355,50 @@ body.no-block [data-need~=block],body.no-rename [data-need~=rename],body.no-nq [
 @keyframes sp{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 ::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:#2a2e34;border-radius:10px;border:3px solid var(--bg)}::-webkit-scrollbar-track{background:transparent}
+
+/* ---- assistant de premier lancement ---- */
+body.setup .app{grid-template-columns:1fr}
+body.setup aside:not(.ob-side),body.setup .hdr-rates,body.setup #pFibre,body.setup #pLive,body.setup #updChip{display:none}
+body.setup #v-auth{overflow:auto}
+body.setup #bSet{display:none}
+#wiz.auth{max-width:none;margin:0;padding:0 24px}
+.ob{max-width:1060px;margin:5vh auto 40px;display:grid;grid-template-columns:290px 1fr;border:1px solid var(--line);border-radius:14px;background:var(--panel);overflow:hidden;min-height:560px}
+.ob-side{background:var(--bg);border-right:1px solid var(--line);padding:26px 24px;display:flex;flex-direction:column;gap:22px}
+.ob-brand{display:flex;gap:12px;align-items:center}.ob-brand b{display:block;font-size:var(--t-lg);font-weight:600}.ob-brand span{font-size:var(--t-xs);color:var(--text-3)}
+.ob-steps{list-style:none;margin:0;padding:0;display:grid;gap:4px}
+.ob-steps li{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--r);color:var(--text-3);font-size:var(--t-sm)}
+.ob-steps li span{width:22px;height:22px;border-radius:50%;border:1px solid var(--line-2);display:grid;place-items:center;font:500 11px var(--mono)}
+.ob-steps li.on{background:var(--panel-2);color:var(--text)}.ob-steps li.on span{border-color:var(--accent);color:var(--accent)}
+.ob-steps li.done{color:var(--text-2)}.ob-steps li.done span{background:var(--accent-dim);border-color:transparent;color:var(--accent)}
+.ob-why{font-size:var(--t-sm);color:var(--text-2);line-height:1.55;margin:0}
+.ob-foot{margin-top:auto;display:flex;gap:10px;align-items:flex-start;font-size:var(--t-xs);color:var(--text-3);line-height:1.5}.ob-foot svg{flex:none;margin-top:1px;color:var(--ok)}
+.ob-main{padding:30px 34px;min-width:0}
+.ob-main h1{font-size:var(--t-xl);font-weight:600;margin:0 0 8px}
+.ob-lead{color:var(--text-2);line-height:1.55;margin:0 0 18px;max-width:62ch}
+.ob-isps{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.ob-isp{display:flex;flex-direction:column;text-align:left;background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:0;color:var(--text);cursor:pointer;font:inherit;overflow:hidden;transition:border-color .15s}
+.ob-isp:hover{border-color:var(--line-2)}.ob-isp:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.ob-isp[aria-pressed=true]{border-color:var(--accent)}
+.ob-isp-b{padding:12px 14px 14px;display:grid;gap:6px;justify-items:start}
+.ob-isp-t{display:flex;align-items:center;gap:8px}.ob-isp-t .lg{width:20px;height:20px;border-radius:4px;background:#fff}
+.ob-isp .m{font-size:var(--t-xs);color:var(--text-3);line-height:1.45}
+.ob-ph{position:relative;height:130px;background:#eceef0;display:grid;place-items:center;overflow:hidden}
+.ob-ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#eceef0}
+.ob-ph.big img,.setph .ob-ph img{object-fit:contain;padding:10px}
+.ob-ph .gbox{width:110px;opacity:.9}.ob-ph:not(:has(img)){background:#16191c}
+.ob-ph.big{height:300px;border-radius:12px;border:1px solid var(--line)}.ob-ph.big .gbox{width:180px}
+.ob-split{display:grid;grid-template-columns:minmax(220px,340px) 1fr;gap:28px;align-items:start}
+.ob-found{display:inline-flex;align-items:center;gap:8px;font-size:var(--t-sm);margin-bottom:10px}.ob-found.ok{color:var(--ok)}.ob-found.warn{color:var(--warn)}
+.ob-kv{margin:0 0 18px;max-width:420px}
+.ob-howto{margin:0 0 14px;padding-left:20px;color:var(--text);line-height:1.8}
+.ob-note,.ob-credit{font-size:var(--t-xs);color:var(--text-3);margin:16px 0 0;line-height:1.5}
+.ob-st{font-size:var(--t-sm);min-height:1.4em}
+.ob-wait{display:flex;gap:6px;margin-top:6px}.ob-wait i{width:8px;height:8px;border-radius:50%;background:var(--accent);opacity:.3;animation:obw 1.2s infinite}.ob-wait i:nth-child(2){animation-delay:.2s}.ob-wait i:nth-child(3){animation-delay:.4s}
+@keyframes obw{50%{opacity:1}}
+.ob-ph.scan::after{content:"";position:absolute;left:0;right:0;height:40%;background:linear-gradient(transparent,rgba(92,200,232,.18),transparent);animation:obs 1.8s ease-in-out infinite}
+@keyframes obs{0%{top:-40%}100%{top:100%}}
+@media (prefers-reduced-motion:reduce){.ob-wait i,.ob-ph.scan::after{animation:none}}
+@media (max-width:900px){.ob{grid-template-columns:1fr}.ob-side{border-right:0;border-bottom:1px solid var(--line)}.ob-isps{grid-template-columns:repeat(2,1fr)}.ob-split{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -734,10 +779,11 @@ body.no-block [data-need~=block],body.no-rename [data-need~=rename],body.no-nq [
     <section class="view" id="v-set">
       <div class="auth" style="max-width:720px">
         <h1>Réglages</h1>
-        <div class="panel" style="margin-top:16px"><div class="panel-h"><h3>Ta box</h3><span class="sub" id="setBoxSub"></span></div><div class="panel-b">
+        <div class="panel" style="margin-top:16px"><div class="panel-h"><h3>Ta box</h3><span class="sub" id="setBoxSub"></span></div><div class="panel-b" style="display:grid;grid-template-columns:180px 1fr;gap:18px;align-items:start">
+          <div id="setBoxPh" class="setph"></div><div>
           <dl class="kv" id="setBox"></dl><div class="flist" id="setFeat"></div>
           <div class="setrow"><button class="btn" id="setChange">Changer d'opérateur ou de box</button><button class="btn ghost" id="setBack">Retour</button></div>
-        </div></div>
+        </div></div></div>
         <div class="panel" style="margin-top:14px" id="setModeP"><div class="panel-h"><h3>Où sont faites les mesures</h3><span class="sub" id="setModeSub"></span></div><div class="panel-b">
           <label style="display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;margin:0 0 10px;cursor:pointer"><input type="radio" name="mode" value="remote" id="modeRemote" style="margin-top:4px"> <span><b>Par l'agent, en continu</b> (recommandé) : le serveur mesure tout le temps, même app fermée. Rien n'est faussé par le Wi‑Fi de cet ordinateur, et les graphiques et le journal des pics sont gardés : tu les retrouves en rouvrant Sonde.</span></label>
           <label style="display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;margin:0 0 10px;cursor:pointer"><input type="radio" name="mode" value="local" id="modeLocal" style="margin-top:4px"> <span><b>Depuis cet ordinateur</b>, seulement quand Sonde est ouverte.</span></label>
@@ -1819,40 +1865,65 @@ $('#bHist').onclick = loadHist;
 
 /* ============ assistant de premier lancement ============ */
 const WZ = { step: 'isp', isp: null, det: null, setup: null };
-const stepsBar = n => `<div class="wsteps">${['Opérateur', 'Box', 'Connexion'].map((l, i) => `<span class="${i === n ? 'on' : ''}">${i + 1}. ${l}</span>`).join('')}</div>`;
+const STEPS = ['Opérateur', 'Box', 'Connexion', 'C\'est prêt'];
+const IC_LOCK = '<svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>';
+const IC_OK = '<svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 10.5l2.6 2.5L14 7.5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+// Illustration neutre (box sans photo libre) : dessin original, aucun modèle réel
+const BOX_SVG = '<svg class="gbox" viewBox="0 0 160 110" aria-hidden="true"><path d="M48 30 40 6M112 30l8-24" stroke="#4a5059" stroke-width="3" stroke-linecap="round"/><rect x="18" y="30" width="124" height="58" rx="10" fill="#1f2328" stroke="#3a4048"/><rect x="18" y="74" width="124" height="14" rx="0" fill="#191c20"/><circle cx="40" cy="52" r="3" fill="#7ccf7a"/><circle cx="52" cy="52" r="3" fill="#5cc8e8"/><circle cx="64" cy="52" r="3" fill="#5cc8e8"/><rect x="92" y="48" width="36" height="8" rx="2" fill="#2a2f35"/><rect x="34" y="92" width="16" height="6" rx="2" fill="#2a2f35"/><rect x="110" y="92" width="16" height="6" rx="2" fill="#2a2f35"/></svg>';
+const boxPic = (key, big) => `<div class="ob-ph${big ? ' big' : ''}">${BOX_SVG}${key ? `<img src="/api/brand/photo?k=${encodeURIComponent(key)}" alt="" data-fb="remove">` : ''}</div>`;
+const creditTxt = c => c ? `Photo ${esc(c.label)} : ${esc(c.artist)}, ${esc(c.license)}, Wikimedia Commons` : '';
 async function openWizard(step) {
   WZ.setup = await api('/api/setup').catch(() => null);
   if (!WZ.setup) return toast('Moteur injoignable', true);
-  $('nav.tabs').style.display = 'none'; show('auth');
+  document.body.classList.add('setup'); $('nav.tabs').style.display = 'none'; show('auth');
   if (step) WZ.step = step;
   else if (WZ.setup.config && !WZ.setup.configured) { WZ.step = 'auth'; WZ.isp = WZ.setup.config.isp; }
   else WZ.step = 'isp';
   renderWizard();
 }
+function wizFrame(n, main) {
+  $('#wiz').innerHTML = `<div class="ob">
+    <aside class="ob-side">
+      <div class="ob-brand"><svg width="34" height="34" viewBox="0 0 22 22" aria-hidden="true"><rect x="1" y="1" width="20" height="20" rx="5" fill="none" stroke="#30353c"/><path d="M4 13h3l2-6 3 9 2-5h4" fill="none" stroke="#5cc8e8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><div><b>Sonde</b><span>Banc de test du réseau de la maison</span></div></div>
+      <ol class="ob-steps">${STEPS.map((l, i) => `<li class="${i < n ? 'done' : i === n ? 'on' : ''}"><span>${i < n ? '✓' : i + 1}</span>${l}</li>`).join('')}</ol>
+      <p class="ob-why">Sonde mesure le ping de chaque appareil, le débit de la fibre et les coupures Wi‑Fi, et garde l'historique pour comparer avant / après un changement.</p>
+      <div class="ob-foot">${IC_LOCK}<span>Tout reste chez toi. Sonde n'envoie rien sur Internet et garde tes codes dans le coffre de l'ordinateur.</span></div>
+    </aside>
+    <section class="ob-main">${main}</section></div>`;
+}
 function renderWizard() {
-  const w = $('#wiz'), su = WZ.setup;
+  const su = WZ.setup;
   if (WZ.step === 'isp') {
-    w.innerHTML = `${stepsBar(0)}<h1>Quel est ton opérateur ?</h1><p>Sonde lit les appareils, le Wi‑Fi et le débit directement dans ta box. Le ping, les tests de débit et les rapports marchent avec toutes les box.</p>
-      <div class="isp">${su.isps.map(i => `<button data-isp="${esc(i.id)}" aria-pressed="${WZ.isp === i.id}"><b>${esc(i.label)}</b><span class="chip ${i.level === 'complet' ? 'ok' : ''}">${esc(i.level)}</span><span class="m">${esc(i.models)} · connexion : ${esc(i.auth)}</span></button>`).join('')}</div>
-      <p class="note" style="font-size:var(--t-xs)">« Expérimental » : écrit à partir de la documentation de la box, pas encore testé sur toutes les versions. Si quelque chose ne marche pas, Sonde passe en mode générique (ping et débit seulement).</p>`;
+    const credits = su.isps.filter(i => i.photoCredit).map(i => `${esc(i.photoCredit.artist)} (${esc(i.photoCredit.label)})`).join(', ');
+    wizFrame(0, `<h1>Quel est ton opérateur ?</h1><p class="ob-lead">Sonde se connecte à ta box pour lister les appareils, lire le signal Wi‑Fi et le débit de la fibre. Le ping, les tests de débit et les rapports marchent avec toutes les box.</p>
+      <div class="ob-isps">${su.isps.map(i => `<button class="ob-isp" data-isp="${esc(i.id)}" aria-pressed="${WZ.isp === i.id}">
+        ${boxPic(i.photo)}
+        <div class="ob-isp-b"><div class="ob-isp-t">${i.logo ? `<img class="lg" src="/api/logo?d=${encodeURIComponent(i.logo)}" alt="" data-fb="remove">` : ''}<b>${esc(i.label)}</b></div>
+        <span class="chip ${i.level === 'complet' ? 'ok' : ''}">${esc(i.level === 'complet' ? 'complet' : i.level === 'expérimental' ? 'expérimental' : 'ping et débit')}</span>
+        <div class="m">${esc(i.models)}</div></div></button>`).join('')}</div>
+      <p class="ob-note">« Expérimental » : écrit d'après l'API de la box, pas encore vérifié sur toutes les versions. En cas de souci, Sonde passe en mode générique (ping et débit).${credits ? `<br>Photos : ${credits}, licence CC BY-SA 4.0, Wikimedia Commons.` : ''}</p>`);
     $$('#wiz [data-isp]').forEach(b => b.onclick = () => { WZ.isp = b.dataset.isp; WZ.step = 'detect'; renderWizard(); });
     return;
   }
+  const want = su.isps.find(i => i.id === WZ.isp) || {};
   if (WZ.step === 'detect') {
-    w.innerHTML = `${stepsBar(1)}<h1>Recherche de ta box…</h1><p>Sonde interroge la passerelle de ton réseau${su.gateway ? ` (${esc(su.gateway)})` : ''}.</p>`;
-    api('/api/setup/detect', { isp: WZ.isp }).then(d => { WZ.det = d; WZ.step = 'found'; renderWizard(); }).catch(e => { w.insertAdjacentHTML('beforeend', `<p class="c-bad">${esc(e.message)}</p>`); });
+    wizFrame(1, `<div class="ob-split">${boxPic(want.photo, true).replace('ob-ph big', 'ob-ph big scan')}<div><h1>Recherche de ta box…</h1><p class="ob-lead">Sonde interroge la passerelle de ton réseau${su.gateway ? ` (${esc(su.gateway)})` : ''} pour reconnaître le modèle.</p><div class="ob-wait"><i></i><i></i><i></i></div></div></div>`);
+    api('/api/setup/detect', { isp: WZ.isp }).then(d => { WZ.det = d; WZ.step = 'found'; renderWizard(); }).catch(e => { $('.ob-main').insertAdjacentHTML('beforeend', `<p class="c-bad">${esc(e.message)}</p>`); });
     return;
   }
   if (WZ.step === 'found') {
-    const d = WZ.det, want = su.isps.find(i => i.id === WZ.isp), lbl = { freebox: 'Freebox', livebox: 'Livebox', bbox: 'Bbox', sfr: 'SFR Box', generic: 'box' }[d.box];
-    let head, txt;
-    if (d.box === 'generic' && WZ.isp !== 'other') { head = 'Box non reconnue'; txt = `Sonde n'a pas trouvé de ${esc(want.label)} compatible à ${esc(d.host || '—')}. Tu peux continuer en mode générique : ping, débit, charge et rapports marchent, mais sans la liste détaillée des appareils, le signal ni le blocage. Tu peux aussi donner l'adresse de ta box.`; }
-    else if (d.box === 'generic') { head = 'Mode générique'; txt = 'Sonde utilisera seulement les mesures faites depuis cet ordinateur et les appareils qu\'il voit sur le réseau.'; }
-    else if (!d.expected) { head = `${esc(d.model || lbl)} trouvée`; txt = `Tu as choisi ${esc(want.label)}, mais la box de ce réseau est une <b>${esc(d.model || lbl)}</b> (${esc(d.host)}). Sonde va utiliser celle-ci.`; }
-    else { head = `${esc(d.model || lbl)} trouvée`; txt = `Adresse : ${esc(d.host)}.`; }
-    w.innerHTML = `${stepsBar(1)}<h1>${head}</h1><p>${txt}</p>
-      ${d.box === 'generic' ? `<div class="fld"><label for="wzHost">Adresse de la box (facultatif)</label><input id="wzHost" placeholder="192.168.1.1" inputmode="decimal" autocomplete="off"></div>` : ''}
-      <div class="setrow"><button class="btn primary" id="wzOk">Continuer</button>${d.box === 'generic' ? '<button class="btn" id="wzRetry">Chercher à cette adresse</button>' : ''}<button class="btn ghost" id="wzBack">Changer d'opérateur</button></div>`;
+    const d = WZ.det, lbl = { freebox: 'Freebox', livebox: 'Livebox', bbox: 'Bbox', sfr: 'SFR Box', generic: 'box' }[d.box];
+    let head, txt, ok = true;
+    if (d.box === 'generic' && WZ.isp !== 'other') { ok = false; head = 'Box non reconnue'; txt = `Sonde n'a pas trouvé de box ${esc(want.label)} compatible à ${esc(d.host || '—')}. Tu peux continuer en mode générique (ping, débit, charge et rapports, sans la liste détaillée des appareils) ou donner l'adresse de ta box.`; }
+    else if (d.box === 'generic') { head = 'Mode générique'; txt = 'Sonde utilisera les mesures faites depuis cet ordinateur et les appareils qu\'il voit sur le réseau.'; }
+    else if (!d.expected) { head = `${esc(d.model || lbl)} trouvée`; txt = `Tu as choisi ${esc(want.label)}, mais la box de ce réseau est une <b>${esc(d.model || lbl)}</b>. Sonde va utiliser celle-ci.`; }
+    else { head = `${esc(d.model || lbl)} trouvée`; txt = 'C\'est bien ta box ? Sonde va s\'y connecter.'; }
+    wizFrame(1, `<div class="ob-split">${boxPic(d.box === 'generic' ? null : d.photo, true)}<div>
+      <div class="ob-found ${ok ? 'ok' : 'warn'}">${ok ? IC_OK : ''}<span>${ok ? 'Box détectée' : 'Pas de box compatible'}</span></div>
+      <h1>${head}</h1><p class="ob-lead">${txt}</p>
+      ${d.box !== 'generic' ? `<dl class="kv ob-kv"><dt>Modèle</dt><dd>${esc(d.model || lbl)}</dd><dt>Adresse</dt><dd>${esc(d.host)}</dd><dt>Connexion</dt><dd>${esc((su.isps.find(i => i.box === d.box) || {}).auth || '')}</dd></dl>` : `<div class="fld"><label for="wzHost">Adresse de la box (facultatif)</label><input id="wzHost" placeholder="192.168.1.1" inputmode="decimal" autocomplete="off"></div>`}
+      <div class="setrow"><button class="btn primary" id="wzOk">Continuer</button>${d.box === 'generic' ? '<button class="btn" id="wzRetry">Chercher à cette adresse</button>' : ''}<button class="btn ghost" id="wzBack">Changer d'opérateur</button></div>
+      ${d.photoCredit ? `<p class="ob-credit">${creditTxt(d.photoCredit)}</p>` : d.box !== 'generic' ? '<p class="ob-credit">Pas encore de photo libre de ce modèle : illustration.</p>' : ''}</div></div>`);
     $('#wzBack').onclick = () => { WZ.step = 'isp'; renderWizard(); };
     if ($('#wzRetry')) $('#wzRetry').onclick = async () => { const h = $('#wzHost').value.trim(); if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(h)) return toast('Adresse attendue, par exemple 192.168.1.1', true); WZ.det = await api('/api/setup/detect', { isp: WZ.isp, host: h }); renderWizard(); };
     $('#wzOk').onclick = async () => {
@@ -1864,23 +1935,43 @@ function renderWizard() {
     return;
   }
   if (WZ.step === 'auth') {
-    const a = su.auth || {}, lbl = su.label || 'box';
+    const a = su.auth || {}, lbl = su.label || 'box', pic = boxPic(su.photo, true);
     if (a.ok || a.kind === 'none') return wizardDone();
+    const back = '<button class="btn ghost" id="wzBack">Changer d\'opérateur</button>';
     if (a.kind === 'button') {
-      w.innerHTML = `${stepsBar(2)}<h1>Autoriser Sonde sur la ${esc(lbl)}</h1><p>Clique sur le bouton puis valide avec la flèche droite sur l'écran de la box, dans les 90 secondes. Sonde reçoit un jeton gardé dans le coffre de cet ordinateur (trousseau d'accès de macOS, chiffrement Windows).</p>
-        <div class="setrow"><button class="btn primary" id="bAuth">Demander l'autorisation</button><button class="btn ghost" id="wzBack">Changer d'opérateur</button></div><p id="authSt" class="mono" style="font-size:var(--t-sm)"></p>`;
+      wizFrame(2, `<div class="ob-split">${pic}<div><h1>Autoriser Sonde sur la ${esc(lbl)}</h1>
+        <ol class="ob-howto"><li>Clique sur « Demander l'autorisation ».</li><li>Sur l'écran de la box, un message « Sonde » apparaît.</li><li>Valide avec la flèche droite, dans les 90 secondes.</li></ol>
+        <p class="ob-lead">Sonde reçoit un jeton gardé dans le coffre de cet ordinateur (trousseau sur Mac, chiffrement Windows). Tu peux le retirer à tout moment dans Freebox OS.</p>
+        <div class="setrow"><button class="btn primary" id="bAuth">Demander l'autorisation</button>${back}</div><p id="authSt" class="mono ob-st"></p></div></div>`);
       $('#bAuth').onclick = async () => { $('#bAuth').disabled = true; $('#authSt').textContent = 'Regarde l\'écran de la box et valide…'; try { await api('/api/setup/auth', {}); } catch (e) { $('#authSt').textContent = e.message; $('#bAuth').disabled = false; } };
     } else {
-      w.innerHTML = `${stepsBar(2)}<h1>Connexion à la ${esc(lbl)}</h1><p>Entre les identifiants de la page d'administration de ta box (souvent écrits sous la box, ou ceux que tu as choisis). Ils restent sur cet ordinateur, dans son coffre (trousseau d'accès de macOS, chiffrement Windows), et ne servent qu'à lire la box.</p>
+      wizFrame(2, `<div class="ob-split">${pic}<div><h1>Connexion à la ${esc(lbl)}</h1><p class="ob-lead">Les identifiants de la page d'administration de ta box (souvent écrits sous la box, ou ceux que tu as choisis). Ils restent dans le coffre de cet ordinateur (trousseau d'accès de macOS, chiffrement Windows) et ne servent qu'à lire la box.</p>
         ${a.user ? `<div class="fld"><label for="wzUser">Identifiant</label><input id="wzUser" value="admin" autocomplete="username"></div>` : ''}
         <div class="fld"><label for="wzPass">Mot de passe</label><input id="wzPass" type="password" autocomplete="current-password"></div>
-        <div class="setrow"><button class="btn primary" id="wzLogin">Se connecter</button><button class="btn ghost" id="wzBack">Changer d'opérateur</button></div><p id="authSt" class="mono" style="font-size:var(--t-sm)"></p>`;
+        <div class="setrow"><button class="btn primary" id="wzLogin">Se connecter</button>${back}</div><p id="authSt" class="mono ob-st"></p></div></div>`);
       const go = async () => { const b = $('#wzLogin'); b.disabled = true; $('#authSt').textContent = 'Connexion…'; try { await api('/api/setup/auth', { user: $('#wzUser')?.value.trim() || undefined, password: $('#wzPass').value }); $('#wzPass').value = ''; wizardDone(); } catch (e) { $('#authSt').textContent = e.message; b.disabled = false; } };
       $('#wzLogin').onclick = go; $('#wzPass').onkeydown = e => { if (e.key === 'Enter') go(); };
       setTimeout(() => $('#wzPass')?.focus(), 50);
     }
     $('#wzBack').onclick = async () => { await api('/api/setup/reset', {}).catch(() => { }); WZ.setup = await api('/api/setup'); WZ.step = 'isp'; renderWizard(); };
   }
+}
+async function wizardDone() {
+  WZ.setup = await api('/api/setup').catch(() => WZ.setup);
+  const su = WZ.setup || {}, f = su.features || {};
+  const L = { signal: 'signal Wi‑Fi', perDeviceRate: 'trafic par appareil', wanRate: 'débit de la fibre', rename: 'noms des appareils', block: 'blocage d\'appareil', repeater: 'répéteur' };
+  wizFrame(3, `<div class="ob-split">${boxPic(su.photo, true)}<div>
+    <div class="ob-found ok">${IC_OK}<span>Connectée</span></div>
+    <h1>C'est prêt</h1><p class="ob-lead">Sonde est reliée à ta ${esc(su.config?.model || su.label || 'box')}. Ce qu'elle permet :</p>
+    <div class="flist">${Object.entries(L).map(([k, l]) => `<span class="chip ${f[k] ? 'ok' : ''}">${f[k] ? '' : 'pas de '}${l}</span>`).join('')}</div>
+    <div class="setrow" style="margin-top:18px"><button class="btn primary" id="wzGo">Ouvrir le tableau de bord</button></div></div></div>`);
+  await applyFeatures();
+  $('#wzGo').onclick = () => { document.body.classList.remove('setup'); $('nav.tabs').style.display = ''; show('live'); loadOverview(); };
+}
+function onAuth(a) {
+  const t = { granted: 'Autorisé. Chargement…', denied: 'Refusé sur la box.', timeout: 'Délai dépassé, recommence.', pending: 'En attente de validation sur la box…' };
+  if ($('#authSt')) $('#authSt').textContent = t[a.status] || a.status;
+  if (a.status === 'granted') wizardDone(); else if (a.status !== 'pending' && $('#bAuth')) $('#bAuth').disabled = false;
 }
 // Connexion au serveur Sonde (agent) : une seule fois, la session est ensuite prolongée à chaque utilisation.
 function openAgentLogin(info = {}) {
@@ -1895,12 +1986,6 @@ function openAgentLogin(info = {}) {
   $('#alGo').onclick = go; $('#alP').onkeydown = e => { if (e.key === 'Enter') go(); };
   $('#alLocal').onclick = async () => { await api('/api/mode', { remote: false }); location.reload(); };
   setTimeout(() => ($('#alU').value ? $('#alP') : $('#alU')).focus(), 50);
-}
-async function wizardDone() { $('#wiz').innerHTML = `${stepsBar(2)}<h1>C'est prêt</h1><p>Chargement des appareils…</p>`; await applyFeatures(); setTimeout(() => { $('nav.tabs').style.display = ''; show('live'); loadOverview(); }, 700); }
-function onAuth(a) {
-  const t = { granted: 'Autorisé. Chargement…', denied: 'Refusé sur la box.', timeout: 'Délai dépassé, recommence.', pending: 'En attente de validation sur la box…' };
-  if ($('#authSt')) $('#authSt').textContent = t[a.status] || a.status;
-  if (a.status === 'granted') wizardDone(); else if (a.status !== 'pending' && $('#bAuth')) $('#bAuth').disabled = false;
 }
 // Ce que la box permet : on masque ce qui n'a pas de sens (signal, trafic par appareil, blocage…)
 let FEAT = null, OSN = 'Mac', MODE = {};
@@ -1925,6 +2010,7 @@ async function openSettings() {
   show('set');
   const c = su.config || {}, f = su.features || {};
   $('#setBoxSub').textContent = (su.isps.find(i => i.id === c.isp) || {}).label || '';
+  $('#setBoxPh').innerHTML = boxPic(su.photo) + (su.photoCredit ? `<p class="ob-credit" style="margin:6px 0 0">${creditTxt(su.photoCredit)}</p>` : '');
   $('#setBox').innerHTML = kv([['Box', c.model || su.label], ['Adresse', c.host], ['Connexion', su.auth?.ok ? 'autorisée' : 'à faire'], ['Ordinateur', su.osLabel + ' · Sonde ' + su.version]]);
   const L = { signal: 'signal Wi‑Fi', perDeviceRate: 'trafic par appareil', wanRate: 'débit de la fibre', rename: 'renommer', block: 'bloquer un appareil', repeater: 'répéteur', ports: 'ports' };
   $('#setFeat').innerHTML = Object.entries(L).map(([k, l]) => `<span class="chip ${f[k] ? 'ok' : ''}">${f[k] ? '' : 'pas de '}${l}</span>`).join('') + (f.experimental ? '<span class="chip warn">prise en charge expérimentale</span>' : '');

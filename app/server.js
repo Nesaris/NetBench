@@ -11,6 +11,7 @@ const path = require('node:path');
 const platform = require('./lib/platform');
 const boxes = require('./lib/boxes');
 const updater = require('./lib/updater');
+const brands = require('./lib/brands');
 
 const VERSION = (() => { try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'version.json'), 'utf8')).version; } catch { return '0.0.0'; } })();
 const PORT = +process.env.SONDE_PORT || 47800;
@@ -693,7 +694,7 @@ const boxHostOk = h => { const [n, port] = String(h || '').split(':'); return (p
 
 // ---------------------------------------------------------------- mode « mesures par l'agent »
 // L'app ne mesure plus rien elle-même : toutes les routes du moteur sont relayées vers l'agent (HTTPS, certificat épinglé).
-const LOCAL_ONLY = /^\/api\/(update|agent\/|mode$|quit$)/;
+const LOCAL_ONLY = /^\/api\/(update|agent\/|mode$|quit$|brand\/)/;
 // Sans jeton, on ne repasse pas en douce sur les mesures locales : l'app demande de se connecter au serveur.
 const remoteOn = () => { if (HEADLESS || !settings.remote) return false; const c = agentCfg(); return !!(c.url && !c.local); };
 function proxyToAgent(req, res, p, search) {
@@ -772,14 +773,23 @@ async function handler(req, res, opts = {}) {
       return;
     }
     // ---- assistant de premier lancement : opérateur, détection de la box, autorisation
+    if (p === '/api/brand/photo') {
+      const k = String(url.searchParams.get('k') || '');
+      if (!brands.PHOTOS[k]) { res.writeHead(404, SEC_HEADERS); return res.end(); }
+      try { const ph = await brands.photo(DATA_DIR, k, VERSION); res.writeHead(200, { ...SEC_HEADERS, 'content-type': ph.type, 'content-security-policy': "default-src 'none'", 'cache-control': 'max-age=31536000, immutable' }); return res.end(ph.buf); }
+      catch { res.writeHead(404, SEC_HEADERS); return res.end(); }
+    }
     if (p === '/api/setup' && req.method === 'GET') {
       const a = box ? await box.authState() : null;
-      return send(res, 200, { version: VERSION, os: platform.OS, osLabel: platform.label, hasNQ: platform.hasNQ, isps: boxes.ISPS, config: boxCfg, configured: !!boxCfg && !!a?.ok, auth: a, features: box?.features || null, label: box?.label || null, gateway: await platform.gateway() });
+      const pk = boxCfg ? brands.photoKey(boxCfg.box, boxCfg.model) : null;
+      return send(res, 200, { version: VERSION, os: platform.OS, osLabel: platform.label, hasNQ: platform.hasNQ, isps: boxes.ISPS.map(i => ({ ...i, ...brands.ISP_MEDIA[i.id], photoCredit: brands.credit(brands.ISP_MEDIA[i.id]?.photo) })), config: boxCfg, photo: pk, photoCredit: brands.credit(pk), configured: !!boxCfg && !!a?.ok, auth: a, features: box?.features || null, label: box?.label || null, gateway: await platform.gateway() });
     }
     if (p === '/api/setup/detect' && req.method === 'POST') {
       const b = await body(req);
       const gw = (/^\d{1,3}(\.\d{1,3}){3}$/.test(b.host || '') && boxHostOk(b.host) ? b.host : null) || await platform.gateway() || '192.168.1.1';
-      return send(res, 200, await boxes.detect(gw, String(b.isp || '')));
+      const d = await boxes.detect(gw, String(b.isp || ''));
+      const pk = brands.photoKey(d.box, d.model);
+      return send(res, 200, { ...d, photo: pk, photoCredit: brands.credit(pk) });
     }
     if (p === '/api/setup/save' && req.method === 'POST') {
       const b = await body(req);
