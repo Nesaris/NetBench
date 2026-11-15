@@ -740,8 +740,8 @@ body.no-block [data-need~=block],body.no-rename [data-need~=rename],body.no-nq [
           <div class="setrow"><button class="btn" id="setChange">Changer d'opérateur ou de box</button><button class="btn ghost" id="setBack">Retour</button></div>
         </div></div>
         <div class="panel" style="margin-top:14px" id="setModeP"><div class="panel-h"><h3>Où sont faites les mesures</h3><span class="sub" id="setModeSub"></span></div><div class="panel-b">
-          <label class="setrow" style="margin:0 0 8px;align-items:flex-start"><input type="radio" name="mode" value="remote" id="modeRemote" style="margin-top:4px"> <span><b>Par l'agent, en continu</b> (recommandé) : le serveur mesure tout le temps, même app fermée. Rien n'est faussé par le Wi‑Fi de cet ordinateur, et les graphiques et le journal des pics sont gardés : tu les retrouves en rouvrant Sonde.</span></label>
-          <label class="setrow" style="margin:0 0 8px;align-items:flex-start"><input type="radio" name="mode" value="local" id="modeLocal" style="margin-top:4px"> <span><b>Depuis cet ordinateur</b>, seulement quand Sonde est ouverte.</span></label>
+          <label style="display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;margin:0 0 10px;cursor:pointer"><input type="radio" name="mode" value="remote" id="modeRemote" style="margin-top:4px"> <span><b>Par l'agent, en continu</b> (recommandé) : le serveur mesure tout le temps, même app fermée. Rien n'est faussé par le Wi‑Fi de cet ordinateur, et les graphiques et le journal des pics sont gardés : tu les retrouves en rouvrant Sonde.</span></label>
+          <label style="display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;margin:0 0 10px;cursor:pointer"><input type="radio" name="mode" value="local" id="modeLocal" style="margin-top:4px"> <span><b>Depuis cet ordinateur</b>, seulement quand Sonde est ouverte.</span></label>
           <p class="note" id="setModeNote" style="font-size:var(--t-xs);margin:4px 0 0"></p>
         </div></div>
         <div class="panel" style="margin-top:14px"><div class="panel-h"><h3>Mises à jour</h3><span class="sub" id="updSub"></span></div><div class="panel-b">
