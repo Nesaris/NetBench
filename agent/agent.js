@@ -133,22 +133,36 @@ function reloadRecent() {
 const HALF = 5 * 60e3; // l'activité DNS « s'efface » de moitié toutes les 5 min
 const decay = (w, t0, t1) => w * Math.pow(0.5, (t1 - t0) / HALF);
 function newId() { let id; do { id = crypto.randomInt(65536); } while (pending.has(id)); return id; }
+// Les requêtes vers la box partent d'une socket à port aléatoire (renouvelée toutes les 10 min) : une fausse
+// réponse envoyée depuis le réseau local devrait deviner le port ET l'identifiant ET la bonne question.
+let upSock = null;
+function newUpSock() {
+  const s = dgram.createSocket('udp4');
+  s.on('message', (msg, rinfo) => {
+    if (msg.length < 12 || rinfo.port !== 53) return;
+    const id = msg.readUInt16BE(0), p = pending.get(id); if (!p || rinfo.address !== p.up) return;
+    const q = parseQName(msg); if (!q || !p.q || q.name !== p.q.name || q.qtype !== p.q.qtype) return;
+    pending.delete(id); msg.writeUInt16BE(p.origId, 0);
+    udp.send(msg, p.rinfo.port, p.rinfo.address);
+  });
+  s.on('error', e => log('DNS amont :', e.message));
+  s.bind(0, '0.0.0.0');
+  const old = upSock; upSock = s; if (old) setTimeout(() => { try { old.close(); } catch { } }, 5000);
+}
+newUpSock(); setInterval(newUpSock, 10 * 60e3);
 function sendUp(p) {
-  const up = UPSTREAMS[Math.min(p.tries, UPSTREAMS.length - 1)];
+  p.up = UPSTREAMS[Math.min(p.tries, UPSTREAMS.length - 1)];
   const m = Buffer.from(p.msg); m.writeUInt16BE(p.upId, 0);
-  udp.send(m, 53, up);
+  upSock.send(m, 53, p.up);
 }
 udp.on('message', (msg, rinfo) => {
-  if (msg.length < 12) return;
-  if (rinfo.port === 53 && UPSTREAMS.includes(rinfo.address)) { // réponse amont
-    const id = msg.readUInt16BE(0), p = pending.get(id); if (!p) return;
-    pending.delete(id); msg.writeUInt16BE(p.origId, 0);
-    udp.send(msg, p.rinfo.port, p.rinfo.address); return;
-  }
+  if (msg.length < 12 || msg.length > 4096) return;
   if (!isLan(rinfo.address)) return; // on ne répond qu'au réseau local
+  if ((msg[2] & 0x80) !== 0) return; // c'est une réponse, pas une question : ignorée
   const q = parseQName(msg); const blk = q && isBlocked(rinfo.address, q.name); noteQuery(rinfo.address, q, blk);
   if (blk) { blk.hits = (blk.hits || 0) + 1; return udp.send(nxdomain(msg, q), rinfo.port, rinfo.address); }
-  const p = { rinfo, origId: msg.readUInt16BE(0), t: now(), tries: 0, msg: Buffer.from(msg), upId: newId() };
+  if (pending.size > 5000) return; // protection contre l'inondation
+  const p = { rinfo, origId: msg.readUInt16BE(0), t: now(), tries: 0, msg: Buffer.from(msg), upId: newId(), q };
   pending.set(p.upId, p); sendUp(p);
 });
 setInterval(() => { // relance vers le DNS de secours, puis abandon
@@ -163,11 +177,11 @@ let dnsState = { ok: false, error: null };
 udp.on('error', e => { log('DNS UDP :', e.message); dnsState = { ok: false, error: e.code === 'EADDRINUSE' ? 'Le port 53 est déjà utilisé sur cette machine' : e.code === 'EACCES' ? 'Pas le droit d\'ouvrir le port 53' : e.message }; if (!API_LOCAL) process.exit(1); });
 udp.bind(DNS_PORT, '0.0.0.0', () => { dnsState = { ok: true, error: null }; log(`DNS sur le port ${DNS_PORT}`); });
 // DNS en TCP (réponses longues) : simple relais
-net.createServer(sock => {
+const dnsTcp = net.createServer(sock => {
   if (!isLan(sock.remoteAddress)) return sock.destroy();
   let buf = Buffer.alloc(0), up = null;
   sock.on('data', d => {
-    buf = Buffer.concat([buf, d]);
+    buf = Buffer.concat([buf, d]); if (buf.length > 70000) return sock.destroy();
     while (buf.length >= 2 && buf.length >= 2 + buf.readUInt16BE(0)) {
       const len = buf.readUInt16BE(0), m = buf.subarray(2, 2 + len); buf = buf.subarray(2 + len);
       const cip = sock.remoteAddress.replace(/^::ffff:/, ''), q = parseQName(m), blk = q && isBlocked(cip, q.name);
@@ -179,7 +193,8 @@ net.createServer(sock => {
   });
   sock.on('error', () => { }); sock.on('close', () => up && up.destroy());
   sock.setTimeout(10000, () => sock.destroy());
-}).on('error', e => log('DNS TCP :', e.message)).listen(DNS_PORT, '0.0.0.0');
+}).on('error', e => log('DNS TCP :', e.message));
+dnsTcp.maxConnections = 64; dnsTcp.listen(DNS_PORT, '0.0.0.0');
 function isLan(a) { a = String(a).replace(/^::ffff:/, ''); return /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.|127\.)/.test(a); }
 
 // =================================================================== flux en direct (SSE) des requêtes
@@ -373,8 +388,7 @@ const fails = new Map(); // ip -> {n, until}
 const tokHash = t => crypto.createHash('sha256').update(t).digest('hex');
 function authUser(req) {
   const h = req.headers.authorization || '';
-  const c = (req.headers.cookie || '').match(/(?:^|;\s*)sonde=([a-f0-9]{64})/);
-  const tok = h.startsWith('Bearer ') ? h.slice(7) : c ? c[1] : null;
+  const tok = h.startsWith('Bearer ') ? h.slice(7) : null;
   if (!tok || !/^[a-f0-9]{64}$/.test(tok)) return null;
   const k = tokHash(tok), s = sessions.get(k); if (!s || s.exp < now()) return null;
   // connexion « une fois pour toutes » : la session est prolongée d'un an à chaque utilisation
@@ -459,7 +473,7 @@ const apiHandler = async (req, res) => {
         if (!want || got.length !== 8 || !crypto.timingSafeEqual(Buffer.from(got), Buffer.from(want.replace('-', '')))) { const n = (f?.n || 0) + 1; fails.set(ip, { n, until: n >= 5 ? now() + 15 * 60e3 : 0 }); return send(res, 403, { error: 'Code d\'installation incorrect (il est affiché à la fin de l\'installation du serveur).' }); }
       }
       if (!/^[\w.@-]{3,32}$/.test(b.user || '')) return send(res, 400, { error: 'Identifiant : 3 à 32 caractères (lettres, chiffres, . _ - @).' });
-      if (String(b.pass || '').length < 10) return send(res, 400, { error: 'Mot de passe : 10 caractères minimum.' });
+      if (String(b.pass || '').length < 12 || String(b.pass) === b.user) return send(res, 400, { error: 'Mot de passe : 12 caractères minimum, différent de l\'identifiant.' });
       const salt = crypto.randomBytes(16).toString('hex');
       writeJSON('users.json', { user: b.user, salt, hash: scrypt(b.pass, salt), created: new Date().toISOString() });
       fs.rmSync(F('setup-code'), { force: true });
@@ -473,7 +487,7 @@ const apiHandler = async (req, res) => {
       fails.delete(ip);
       const tok = crypto.randomBytes(32).toString('hex');
       sessions.set(tokHash(tok), { user: u.user, exp: now() + 365 * 86400e3, created: now(), last: now(), ip, name: String(b.device || '').replace(/[^\w .'’-]/g, '').slice(0, 40) || null }); saveSessions();
-      return send(res, 200, { token: tok, user: u.user }, { 'set-cookie': `sonde=${tok}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${30 * 86400}` });
+      return send(res, 200, { token: tok, user: u.user });
     }
     const user = authUser(req);
     if (!user) return send(res, 401, { error: 'Connexion requise.' });
@@ -494,7 +508,7 @@ const apiHandler = async (req, res) => {
     if (p === '/api/password' && req.method === 'POST') {
       const b = await body(req), u = users();
       if (!crypto.timingSafeEqual(Buffer.from(scrypt(String(b.old || ''), u.salt), 'hex'), Buffer.from(u.hash, 'hex'))) return send(res, 401, { error: 'Ancien mot de passe incorrect.' });
-      if (String(b.pass || '').length < 10) return send(res, 400, { error: 'Mot de passe : 10 caractères minimum.' });
+      if (String(b.pass || '').length < 12 || String(b.pass) === b.user) return send(res, 400, { error: 'Mot de passe : 12 caractères minimum, différent de l\'identifiant.' });
       const salt = crypto.randomBytes(16).toString('hex'); writeJSON('users.json', { ...u, salt, hash: scrypt(b.pass, salt) });
       sessions.clear(); saveSessions(); return send(res, 200, { ok: true });
     }
@@ -592,7 +606,11 @@ const apiHandler = async (req, res) => {
   } catch (e) { log('API', p, e.message); send(res, 500, { error: e.message }); }
 };
 if (API_LOCAL) require('node:http').createServer(apiHandler).listen(HTTPS_PORT, '127.0.0.1', () => log(`API locale sur 127.0.0.1:${HTTPS_PORT}`));
-else https.createServer({ key: fs.readFileSync(F('tls.key')), cert: fs.readFileSync(F('tls.crt')) }, apiHandler).listen(HTTPS_PORT, '0.0.0.0', () => log(`API HTTPS sur le port ${HTTPS_PORT}`));
+else {
+  const srv = https.createServer({ key: fs.readFileSync(F('tls.key')), cert: fs.readFileSync(F('tls.crt')), minVersion: 'TLSv1.3' }, apiHandler);
+  srv.requestTimeout = 15000; srv.headersTimeout = 10000; srv.maxConnections = 128; srv.maxHeadersCount = 40;
+  srv.listen(HTTPS_PORT, '0.0.0.0', () => log(`API HTTPS sur le port ${HTTPS_PORT} (empreinte ${new crypto.X509Certificate(fs.readFileSync(F('tls.crt'))).fingerprint256})`));
+}
 
 process.on('SIGTERM', () => { stats.save(); process.exit(0); });
 process.on('uncaughtException', e => log('erreur :', e.stack || e.message));

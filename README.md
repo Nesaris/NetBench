@@ -63,9 +63,12 @@ L'agent ne lit que les **noms de domaine** demandés (pas les pages ni le conten
 
 - **Tout reste chez toi.** Sonde écoute seulement sur `127.0.0.1` ; l'agent répond seulement au réseau local. Aucune télémétrie.
 - **Mots de passe de box** gardés dans le coffre du système : trousseau d'accès sur Mac, chiffrement DPAPI du compte sur Windows.
-- **Agent** : API HTTPS (certificat épinglé par Sonde au premier contact), compte créé par toi dans l'app, mots de passe hachés (scrypt), blocage après 5 essais ratés.
+- **Agent** : API HTTPS en TLS 1.3 (certificat épinglé, empreinte affichée), compte créé avec un code d'installation à usage unique, mots de passe hachés (scrypt), blocage après 5 essais ratés, sessions révocables.
+- **Interface** : accessible seulement à la fenêtre ouverte par l'icône (clé d'accès locale), politique de sécurité du contenu stricte, aucune ressource chargée depuis Internet (polices et pictogrammes inclus).
 - **Mises à jour signées** : chaque version est signée (Ed25519) par le mainteneur. Sonde, les installeurs et l'agent vérifient la signature avant d'installer quoi que ce soit ; une version modifiée par quelqu'un d'autre est refusée. Node.js est téléchargé depuis nodejs.org et son empreinte SHA-256 est vérifiée.
 - **Retour arrière automatique** : si une nouvelle version plante au démarrage, Sonde revient à la précédente.
+
+Détails et signalement d'une faille : [SECURITY.md](SECURITY.md).
 
 ## Mises à jour
 

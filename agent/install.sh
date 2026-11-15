@@ -132,9 +132,20 @@ PrivateDevices=yes
 ProtectKernelTunables=yes
 ProtectKernelModules=yes
 ProtectControlGroups=yes
-RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
 RestrictNamespaces=yes
 LockPersonality=yes
+ProtectKernelLogs=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectProc=invisible
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+SystemCallArchitectures=native
+SystemCallFilter=@system-service
+SystemCallErrorNumber=EPERM
+UMask=0077
+# V8 (le moteur JavaScript) a besoin de mémoire exécutable : MemoryDenyWriteExecute reste désactivé
 MemoryDenyWriteExecute=no
 ReadWritePaths=$DATA
 
@@ -173,6 +184,8 @@ IP="$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src") 
 say "Sonde Agent $VER installé ($MODE)."
 echo
 echo "  Dans Sonde : onglet Services → adresse de l'agent :  https://${IP:-IP-de-cette-machine}:8443"
+echo "  Empreinte du certificat (Sonde l'affiche aussi dans Réglages : elles doivent être identiques) :"
+echo "    $(openssl x509 -noout -fingerprint -sha256 -in "$DATA/tls.crt" | cut -d= -f2)"
 if [ -s "$DATA/setup-code" ]; then
   echo "  Puis crée ton identifiant et ton mot de passe dans l'app, avec ce code d'installation :  $(cat "$DATA/setup-code")"
   echo "  (sans ce code, personne d'autre sur le réseau ne peut créer le compte à ta place)"

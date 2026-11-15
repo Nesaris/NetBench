@@ -18,6 +18,7 @@ const PORT = +process.env.SONDE_PORT || 47800;
 const HEADLESS = !!process.env.SONDE_HEADLESS;
 const HOST = '127.0.0.1';
 const DATA_DIR = platform.dataDir;
+try { if (platform.OS !== 'win') fs.chmodSync(DATA_DIR, 0o700); } catch { }
 const HIST_FILE = path.join(DATA_DIR, 'history.json');
 
 // ---------------------------------------------------------------- utilitaires
@@ -665,9 +666,10 @@ setInterval(async () => { const c = agentCfg(); if (!c.url || !c.token || !devCa
 
 // ---------------------------------------------------------------- HTTP
 const INDEX = path.join(__dirname, 'index.html');
+const SEC_HEADERS = { 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'cross-origin-opener-policy': 'same-origin', 'cross-origin-resource-policy': 'same-origin', 'x-frame-options': 'DENY', 'permissions-policy': 'camera=(), microphone=(), geolocation=()' };
 function send(res, code, obj) {
   const b = JSON.stringify(obj);
-  res.writeHead(code, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
+  res.writeHead(code, { ...SEC_HEADERS, 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' });
   res.end(b);
 }
 function body(req) {
@@ -706,7 +708,7 @@ function proxyToAgent(req, res, p, search) {
     if (c.fp && fp !== c.fp) { ur.resume(); return send(res, 495, { error: 'Certificat de l\'agent différent de celui mémorisé : connexion refusée.' }); }
     if (ur.statusCode === 401) { ur.resume(); const { token, ...rest } = c; saveAgent(rest); return send(res, 401, { error: 'Connexion au serveur Sonde requise', needAgentLogin: true, agent: c.url, user: c.user || null }); }
     if (sse) { proxied++; lastClientSeen = now(); res.on('close', () => { proxied--; lastClientSeen = now(); up.destroy(); }); }
-    res.writeHead(ur.statusCode, { 'content-type': ur.headers['content-type'] || 'application/json', 'cache-control': 'no-store', ...(sse ? { connection: 'keep-alive' } : {}) });
+    res.writeHead(ur.statusCode, { ...SEC_HEADERS, 'content-type': ur.headers['content-type'] || 'application/json', 'cache-control': 'no-store', ...(/^\/api\/logo/.test(p) ? { 'content-security-policy': "default-src 'none'" } : {}), ...(sse ? { connection: 'keep-alive' } : {}) });
     ur.pipe(res);
   });
   up.on('timeout', () => up.destroy(new Error('délai dépassé')));
@@ -717,6 +719,14 @@ function proxyToAgent(req, res, p, search) {
 async function handler(req, res, opts = {}) {
   const url = new URL(req.url, 'http://x');
   const p = url.pathname;
+  if (!opts.embedded && p.startsWith('/static/') && req.method === 'GET' && okHost(req.headers.host)) {
+    // polices et pictogrammes livrés avec l'app (liste fermée, pas de chemin libre)
+    const m = p.match(/^\/static\/(fonts\.css|fonts\/[a-z0-9-]+\.woff2|icons\/[a-z0-9]+\.svg)$/);
+    const f = m && path.join(__dirname, 'static', m[1]);
+    if (!f || !fs.existsSync(f)) { res.writeHead(404, SEC_HEADERS); return res.end(); }
+    res.writeHead(200, { ...SEC_HEADERS, 'content-type': f.endsWith('.css') ? 'text/css' : f.endsWith('.svg') ? 'image/svg+xml' : 'font/woff2', 'cache-control': 'max-age=86400' });
+    return fs.createReadStream(f).pipe(res);
+  }
   if (!opts.embedded) {
     // Protection contre le DNS rebinding / appels d'autres sites
     if (!okHost(req.headers.host)) { res.writeHead(403); return res.end(); }
@@ -741,8 +751,13 @@ async function handler(req, res, opts = {}) {
     }
     if (p === '/api/history/live') return send(res, 200, await liveHistory(Math.max(60, Math.min(7 * 86400, +url.searchParams.get('range') || 180))));
     if (p === '/' && req.method === 'GET') {
-      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' });
-      return fs.createReadStream(INDEX).pipe(res);
+      // Politique de sécurité du contenu : seul le script de Sonde (nonce à usage unique) peut s'exécuter,
+      // aucune ressource externe, aucune requête vers un autre site, pas d'intégration dans une autre page.
+      const nonce = crypto.randomBytes(16).toString('base64');
+      const html = fs.readFileSync(INDEX, 'utf8').replace('<script>', `<script nonce="${nonce}">`);
+      res.writeHead(200, { ...SEC_HEADERS, 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store',
+        'content-security-policy': `default-src 'none'; script-src 'nonce-${nonce}'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'` });
+      return res.end(html);
     }
     if (p === '/api/stream') {
       res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-store', connection: 'keep-alive' });
@@ -852,7 +867,7 @@ async function handler(req, res, opts = {}) {
       const c = agentCfg();
       if (sub === '/status') {
         if (!c.url) return send(res, 200, { configured: false, box: box?.id || null, localPossible: true });
-        try { const h = await agentReq('GET', '/api/health', null, { noAuth: true }); let logged = false; if (c.token) { const t = await agentReq('GET', '/api/fbx/status'); logged = t.status === 200; } return send(res, 200, { configured: true, url: c.url, local: !!c.local, reachable: true, setup: h.body.setup, needCode: !!h.body.needCode, version: h.body.version, fbx: h.body.fbx, freebox: h.body.freebox, dns: h.body.dns, engine: !!h.body.engine, logged, user: c.user || null }); }
+        try { const h = await agentReq('GET', '/api/health', null, { noAuth: true }); let logged = false; if (c.token) { const t = await agentReq('GET', '/api/fbx/status'); logged = t.status === 200; } return send(res, 200, { configured: true, url: c.url, local: !!c.local, reachable: true, fp: c.fp || null, setup: h.body.setup, needCode: !!h.body.needCode, version: h.body.version, fbx: h.body.fbx, freebox: h.body.freebox, dns: h.body.dns, engine: !!h.body.engine, logged, user: c.user || null }); }
         catch (e) { return send(res, 200, { configured: true, url: c.url, local: !!c.local, reachable: false, error: e.message }); }
       }
       if (sub === '/connect' && req.method === 'POST') {
@@ -913,7 +928,7 @@ async function handler(req, res, opts = {}) {
           fs.writeFileSync(f, Buffer.from(await r.arrayBuffer()));
         } catch { res.writeHead(404); return res.end(); }
       }
-      res.writeHead(200, { 'content-type': 'image/png', 'cache-control': 'max-age=604800' });
+      res.writeHead(200, { ...SEC_HEADERS, 'content-type': 'image/png', 'content-security-policy': "default-src 'none'", 'cache-control': 'max-age=604800' });
       return fs.createReadStream(f).pipe(res);
     }
     // ---- blocage d'un appareil : refusé sur le Wi-Fi de la box (filtrage par adresse MAC)
