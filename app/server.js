@@ -674,10 +674,22 @@ function body(req) {
   return new Promise(r => { let b = ''; req.on('data', d => { b += d; if (b.length > 1e5) req.destroy(); }); req.on('end', () => { try { r(JSON.parse(b || '{}')); } catch { r({}); } }); });
 }
 const okHost = h => h === `127.0.0.1:${PORT}` || h === `localhost:${PORT}`;
+// Clé d'accès à l'interface : seule la fenêtre ouverte par l'icône Sonde la connaît (fichier lisible par
+// l'utilisateur seul). Un autre compte de l'ordinateur, ou une page web, ne peut donc pas piloter Sonde.
+const UI_KEY = HEADLESS ? null : (() => {
+  const f = path.join(DATA_DIR, 'ui.key');
+  try { const k = fs.readFileSync(f, 'utf8').trim(); if (/^[a-f0-9]{64}$/.test(k)) return k; } catch { }
+  const k = crypto.randomBytes(32).toString('hex'); fs.writeFileSync(f, k, { mode: 0o600 }); return k;
+})();
+const keyOk = k => typeof k === 'string' && k.length === 64 && crypto.timingSafeEqual(Buffer.from(k), Buffer.from(UI_KEY));
+// Adresse de box acceptée : IPv4 privée ou nom local connu de la box (évite d'en faire un relais vers Internet)
+const BOX_NAMES = /^(mafreebox\.freebox\.fr|mabbox\.bytel\.fr|livebox\.home|livebox\.lan)$/i;
+const privateIp = h => /^\d+\.\d+\.\d+\.\d+$/.test(h) && /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(h);
+const boxHostOk = h => { const [n, port] = String(h || '').split(':'); return (privateIp(n) || BOX_NAMES.test(n)) && (!port || /^\d{1,5}$/.test(port)); };
 
 // ---------------------------------------------------------------- mode « mesures par l'agent »
 // L'app ne mesure plus rien elle-même : toutes les routes du moteur sont relayées vers l'agent (HTTPS, certificat épinglé).
-const LOCAL_ONLY = /^\/api\/(update|agent\/|mode$|quit$|logo$)/;
+const LOCAL_ONLY = /^\/api\/(update|agent\/|mode$|quit$)/;
 // Sans jeton, on ne repasse pas en douce sur les mesures locales : l'app demande de se connecter au serveur.
 const remoteOn = () => { if (HEADLESS || !settings.remote) return false; const c = agentCfg(); return !!(c.url && !c.local); };
 function proxyToAgent(req, res, p, search) {
@@ -709,6 +721,17 @@ async function handler(req, res, opts = {}) {
     // Protection contre le DNS rebinding / appels d'autres sites
     if (!okHost(req.headers.host)) { res.writeHead(403); return res.end(); }
     if (req.method !== 'GET' && req.headers.origin && !okHost((req.headers.origin || '').replace(/^https?:\/\//, ''))) { res.writeHead(403); return res.end(); }
+    if (!process.env.SONDE_NO_UIKEY) {
+      if (p === '/' && url.searchParams.get('k')) {
+        if (!keyOk(url.searchParams.get('k'))) { res.writeHead(403); return res.end(); }
+        res.writeHead(302, { location: '/', 'set-cookie': `sonde_ui=${UI_KEY}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000`, 'cache-control': 'no-store' }); return res.end();
+      }
+      const ck = ((req.headers.cookie || '').match(/(?:^|;\s*)sonde_ui=([a-f0-9]{64})/) || [])[1];
+      if (!keyOk(ck)) {
+        if (p === '/') { res.writeHead(401, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' }); return res.end('<!doctype html><meta charset="utf-8"><title>Sonde</title><body style="font:15px system-ui;background:#0d0f12;color:#c9d1d9;display:grid;place-items:center;height:90vh;margin:0"><p>Ouvre Sonde depuis son icône (dossier Applications sur Mac, menu Démarrer sur Windows).</p></body>'); }
+        return send(res, 401, { error: 'Accès refusé' });
+      }
+    }
     if (p.startsWith('/api/') && !LOCAL_ONLY.test(p) && remoteOn()) return proxyToAgent(req, res, p, url.search);
   } else if (/^\/api\/(agent\/|update|mode$)/.test(p)) return send(res, 404, { error: 'introuvable' });
   try {
@@ -738,13 +761,13 @@ async function handler(req, res, opts = {}) {
     }
     if (p === '/api/setup/detect' && req.method === 'POST') {
       const b = await body(req);
-      const gw = (/^\d{1,3}(\.\d{1,3}){3}$/.test(b.host || '') ? b.host : null) || await platform.gateway() || '192.168.1.1';
+      const gw = (/^\d{1,3}(\.\d{1,3}){3}$/.test(b.host || '') && boxHostOk(b.host) ? b.host : null) || await platform.gateway() || '192.168.1.1';
       return send(res, 200, await boxes.detect(gw, String(b.isp || '')));
     }
     if (p === '/api/setup/save' && req.method === 'POST') {
       const b = await body(req);
       if (!boxes.ADAPTERS[b.box]) return send(res, 400, { error: 'Box inconnue' });
-      if (!/^[\w.-]{1,80}(:\d{1,5})?$/.test(b.host || '')) return send(res, 400, { error: 'Adresse de box invalide' });
+      if (!/^[\w.-]{1,80}(:\d{1,5})?$/.test(b.host || '') || (!boxHostOk(b.host) && !process.env.SONDE_ANY_BOX_HOST)) return send(res, 400, { error: 'Adresse de box invalide : adresse du réseau local attendue (ex. 192.168.1.1)' });
       boxCfg = { isp: String(b.isp || ''), box: b.box, host: b.host, base: /^https?:\/\/[\w.-]+(:\d+)?\/api\/v1$/.test(b.base || '') ? b.base : undefined, api: +b.api || undefined, model: String(b.model || '').slice(0, 60) || null, label: b.box === 'generic' ? String(b.label || 'Box').slice(0, 40) : undefined };
       fs.writeFileSync(BOX_FILE, JSON.stringify(boxCfg)); loadBox(); known = null;
       return send(res, 200, { ok: true, features: box.features, auth: await box.authState() });
@@ -829,7 +852,7 @@ async function handler(req, res, opts = {}) {
       const c = agentCfg();
       if (sub === '/status') {
         if (!c.url) return send(res, 200, { configured: false, box: box?.id || null, localPossible: true });
-        try { const h = await agentReq('GET', '/api/health', null, { noAuth: true }); let logged = false; if (c.token) { const t = await agentReq('GET', '/api/fbx/status'); logged = t.status === 200; } return send(res, 200, { configured: true, url: c.url, local: !!c.local, reachable: true, setup: h.body.setup, version: h.body.version, fbx: h.body.fbx, freebox: h.body.freebox, dns: h.body.dns, engine: !!h.body.engine, logged, user: c.user || null }); }
+        try { const h = await agentReq('GET', '/api/health', null, { noAuth: true }); let logged = false; if (c.token) { const t = await agentReq('GET', '/api/fbx/status'); logged = t.status === 200; } return send(res, 200, { configured: true, url: c.url, local: !!c.local, reachable: true, setup: h.body.setup, needCode: !!h.body.needCode, version: h.body.version, fbx: h.body.fbx, freebox: h.body.freebox, dns: h.body.dns, engine: !!h.body.engine, logged, user: c.user || null }); }
         catch (e) { return send(res, 200, { configured: true, url: c.url, local: !!c.local, reachable: false, error: e.message }); }
       }
       if (sub === '/connect' && req.method === 'POST') {
@@ -845,7 +868,7 @@ async function handler(req, res, opts = {}) {
         if (r.status === 200 && r.body.token) { saveAgent({ ...c, token: r.body.token, user: r.body.user }); return send(res, 200, { ok: true, user: r.body.user }); }
         return send(res, r.status, r.body);
       }
-      if (sub === '/setup' && req.method === 'POST') { const b = await body(req); const r = await agentReq('POST', '/api/setup', { user: b.user, pass: b.pass }, { noAuth: true }); return send(res, r.status, r.body); }
+      if (sub === '/setup' && req.method === 'POST') { const b = await body(req); const r = await agentReq('POST', '/api/setup', { user: b.user, pass: b.pass, code: b.code }, { noAuth: true }); return send(res, r.status, r.body); }
       if (sub === '/forget' && req.method === 'POST') { stopLocalAgent(); saveAgent({}); return send(res, 200, { ok: true }); }
       if (sub === '/local' && req.method === 'POST') {
         const b = await body(req);
@@ -970,6 +993,7 @@ if (HEADLESS) {
   const server = http.createServer((req, res) => handler(req, res));
   server.on('error', e => { if (e.code === 'EADDRINUSE') { log('déjà lancé'); return shutdown(); } throw e; });
   if (settings.localAgent) startLocalAgent().catch(e => log('agent local :', e.message));
+  try { require('./lib/launchers').refresh({ root: path.dirname(path.dirname(__dirname)), node: process.execPath, dataDir: DATA_DIR, log }); } catch (e) { log('lanceur :', e.message); }
   updater.init({ version: VERSION, dataDir: DATA_DIR, appDir: __dirname, log, broadcast: (...a) => broadcast(...a), idle: () => !(load && load.running) && !(full && full.running) && !scanning });
   server.listen(PORT, HOST, () => log(`Sonde ${VERSION} prête : http://${HOST}:${PORT}`));
 }

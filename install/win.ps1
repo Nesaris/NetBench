@@ -73,26 +73,8 @@ fs.rmSync(dest,{recursive:true,force:true}); fs.renameSync(tmp,dest);
   Copy-Item (Join-Path $Root "versions\$ver\launcher.js") (Join-Path $Root 'launcher.js') -Force
 
   # ---------------------------------------------------------------- lanceur (moteur caché + fenêtre Edge)
-  $vbs = @"
-' Démarre le moteur de Sonde s'il ne tourne pas, puis ouvre la fenêtre.
-Set sh = CreateObject("WScript.Shell")
-Function Up()
-  On Error Resume Next
-  Set x = CreateObject("MSXML2.ServerXMLHTTP.6.0")
-  x.setTimeouts 500, 500, 500, 500
-  x.Open "GET", "http://127.0.0.1:47800/api/setup", False
-  x.Send
-  Up = (Err.Number = 0 And x.Status = 200)
-End Function
-If Not Up() Then
-  sh.Run """$Node"" ""$Root\launcher.js""", 0, False
-  For i = 1 To 50
-    WScript.Sleep 200
-    If Up() Then Exit For
-  Next
-End If
-sh.Run "msedge --app=http://127.0.0.1:47800 --user-data-dir=""$env:LOCALAPPDATA\Sonde\window"" --window-size=1480,940 --no-first-run", 1, False
-"@
+  $launchers = Join-Path $Root "versions\$ver\lib\launchers.js"
+  $vbs = (& $Node -e "process.stdout.write(require(process.argv[1]).win(process.argv[2],process.argv[3],process.argv[4]))" $launchers $Root $Node (Join-Path $env:APPDATA 'Sonde')) -join "`r`n"
   $vbsFile = Join-Path $Root 'Sonde.vbs'; Set-Content -Path $vbsFile -Value $vbs -Encoding Unicode
   $ws = New-Object -ComObject WScript.Shell
   foreach ($lnk in @($StartMenu, $Desktop)) {

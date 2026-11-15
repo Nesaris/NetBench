@@ -168,11 +168,16 @@ if command -v ufw >/dev/null && ufw status | grep -q 'Status: active'; then
   for net in 192.168.0.0/16 10.0.0.0/8 172.16.0.0/12; do ufw allow from $net to any port 53 >/dev/null; ufw allow from $net to any port 8443 proto tcp >/dev/null; done
 fi
 
-sleep 2
+for i in $(seq 1 20); do [ -s "$DATA/setup-code" ] || [ -s "$DATA/users.json" ] && break; sleep 1; done
 IP="$(ip route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<=NF;i++) if($i=="src") print $(i+1)}' | head -1)"
 say "Sonde Agent $VER installé ($MODE)."
 echo
 echo "  Dans Sonde : onglet Services → adresse de l'agent :  https://${IP:-IP-de-cette-machine}:8443"
-echo "  Puis crée ton identifiant et ton mot de passe dans l'app (premier lancement)."
+if [ -s "$DATA/setup-code" ]; then
+  echo "  Puis crée ton identifiant et ton mot de passe dans l'app, avec ce code d'installation :  $(cat "$DATA/setup-code")"
+  echo "  (sans ce code, personne d'autre sur le réseau ne peut créer le compte à ta place)"
+else
+  echo "  Puis connecte-toi avec ton identifiant et ton mot de passe."
+fi
 echo "  Pour que les appareils l'utilisent : DNS 1 = ${IP:-cette machine}, DNS 2 = ta box (réglage DHCP de la box, ou sur chaque appareil)."
 echo

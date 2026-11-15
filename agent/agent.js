@@ -434,19 +434,35 @@ if (!API_LOCAL && fs.existsSync(path.join(__dirname, 'engine', 'server.js'))) {
     log('moteur de mesure démarré');
   } catch (e) { log('moteur de mesure indisponible :', e.message); }
 }
+// Code d'installation : tant qu'aucun compte n'existe, il faut ce code (affiché à la fin de l'installation,
+// lisible seulement par l'administrateur du serveur) pour créer le compte. Personne d'autre sur le réseau ne
+// peut donc « réclamer » le serveur avant toi.
+function setupCode() {
+  if (users() || API_LOCAL) return null;
+  try { const c = fs.readFileSync(F('setup-code'), 'utf8').trim(); if (c) return c; } catch { }
+  const c = crypto.randomBytes(4).toString('hex').toUpperCase().replace(/^(.{4})/, '$1-');
+  fs.writeFileSync(F('setup-code'), c + '\n', { mode: 0o600 }); return c;
+}
+if (setupCode()) log(`Code d'installation (à saisir dans Sonde pour créer le compte) : ${setupCode()}`);
 const apiHandler = async (req, res) => {
   const ip = String(req.socket.remoteAddress).replace(/^::ffff:/, '');
   if (!isLan(ip)) { res.writeHead(403); return res.end(); }
   const url = new URL(req.url, 'https://x'), p = url.pathname;
   try {
-    if (p === '/api/health') return send(res, 200, { ok: true, version: VERSION, setup: !users(), fbx: fbxState.ok, freebox: IS_FBX, dns: dnsState, local: API_LOCAL, engine: !!engine, uptime: Math.round(process.uptime()) });
+    if (p === '/api/health') return send(res, 200, { ok: true, version: VERSION, setup: !users(), needCode: !users() && !API_LOCAL, fbx: fbxState.ok, freebox: IS_FBX, dns: dnsState, local: API_LOCAL, engine: !!engine, uptime: Math.round(process.uptime()) });
     if (p === '/api/setup' && req.method === 'POST') {
       if (users()) return send(res, 409, { error: 'Le compte existe déjà.' });
       const b = await body(req);
+      if (!API_LOCAL) {
+        const f = fails.get(ip); if (f && f.until > now()) return send(res, 429, { error: `Trop d'essais. Réessaie dans ${Math.ceil((f.until - now()) / 60000)} min.` });
+        const want = setupCode(), got = String(b.code || '').toUpperCase().replace(/[^0-9A-F]/g, '');
+        if (!want || got.length !== 8 || !crypto.timingSafeEqual(Buffer.from(got), Buffer.from(want.replace('-', '')))) { const n = (f?.n || 0) + 1; fails.set(ip, { n, until: n >= 5 ? now() + 15 * 60e3 : 0 }); return send(res, 403, { error: 'Code d\'installation incorrect (il est affiché à la fin de l\'installation du serveur).' }); }
+      }
       if (!/^[\w.@-]{3,32}$/.test(b.user || '')) return send(res, 400, { error: 'Identifiant : 3 à 32 caractères (lettres, chiffres, . _ - @).' });
       if (String(b.pass || '').length < 10) return send(res, 400, { error: 'Mot de passe : 10 caractères minimum.' });
       const salt = crypto.randomBytes(16).toString('hex');
       writeJSON('users.json', { user: b.user, salt, hash: scrypt(b.pass, salt), created: new Date().toISOString() });
+      fs.rmSync(F('setup-code'), { force: true });
       return send(res, 200, { ok: true });
     }
     if (p === '/api/login' && req.method === 'POST') {

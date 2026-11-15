@@ -1503,6 +1503,7 @@ async function svcInit() {
     <div class="err" id="agErr"></div><button class="btn primary" id="agGo" style="margin-top:6px">Se connecter à l'agent</button>`) , bindConnect(), ($('#agLocal').onclick = async () => { $('#agLocal').disabled = true; $('#agLocal').textContent = 'Démarrage…'; try { await api('/api/agent/local', { on: true }); svcInit(); } catch (e) { $('#agErr').textContent = e.message; $('#agLocal').disabled = false; } });
   if (!st.reachable) return gate(`<h2>Agent injoignable</h2><p>${esc(st.url)} ne répond pas : ${esc(st.error || '')}. ${st.local ? 'L\'agent de cet ordinateur ne démarre pas.' : 'La machine de l\'agent est peut-être arrêtée. Internet n\'est pas touché : la box reste DNS de secours.'}</p><button class="btn" id="agRetry">Réessayer</button> <button class="btn ghost" id="agForget">Choisir une autre installation</button>`), ($('#agRetry').onclick = svcInit), ($('#agForget').onclick = async () => { await api('/api/agent/local', { on: false }).catch(() => { }); await api('/api/agent/logout', {}).catch(() => { }); await api('/api/agent/forget', {}).catch(() => { }); svcInit(); });
   if (st.setup) return gate(`<h2>Créer ton compte</h2><p>Premier lancement : choisis l'identifiant et le mot de passe qui protègent l'accès aux services et sites de la maison. Le mot de passe n'est jamais stocké en clair.</p>
+    ${st.needCode ? `<label for="suC">Code d'installation (affiché à la fin de l'installation du serveur)</label><input id="suC" autocomplete="off" placeholder="XXXX-XXXX" style="text-transform:uppercase">` : ''}
     <label for="suU">Identifiant</label><input id="suU" autocomplete="username">
     <label for="suP">Mot de passe (10 caractères minimum)</label><input id="suP" type="password" autocomplete="new-password">
     <label for="suP2">Confirmer le mot de passe</label><input id="suP2" type="password" autocomplete="new-password">
@@ -1521,7 +1522,7 @@ function bindSetup() {
   const go = async () => {
     const u = $('#suU').value.trim(), p1 = $('#suP').value, p2 = $('#suP2').value; $('#suErr').textContent = '';
     if (p1 !== p2) return $('#suErr').textContent = 'Les deux mots de passe ne sont pas identiques.';
-    try { await api('/api/agent/setup', { user: u, pass: p1 }); await api('/api/agent/login', { user: u, pass: p1 }); svcInit(); } catch (e) { $('#suErr').textContent = e.message; }
+    try { await api('/api/agent/setup', { user: u, pass: p1, code: $('#suC')?.value.trim() }); await api('/api/agent/login', { user: u, pass: p1 }); svcInit(); } catch (e) { $('#suErr').textContent = e.message; }
   };
   $('#suGo').onclick = go; $('#suP2').onkeydown = e => { if (e.key === 'Enter') go(); };
 }

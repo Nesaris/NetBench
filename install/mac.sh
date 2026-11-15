@@ -92,23 +92,7 @@ cat > "$APP/Contents/Info.plist" <<PL
 </dict></plist>
 PL
 [ -f "$ROOT/versions/$VER/assets/icon.icns" ] && cp "$ROOT/versions/$VER/assets/icon.icns" "$APP/Contents/Resources/icon.icns"
-cat > "$APP/Contents/MacOS/Sonde" <<'SH'
-#!/bin/bash
-# Démarre le moteur s'il ne tourne pas, puis ouvre la fenêtre de Sonde.
-URL=http://127.0.0.1:47800
-LABEL=fr.nesaris.sonde
-if ! /usr/bin/curl -s -m 1 -o /dev/null "$URL/api/setup"; then
-  launchctl kickstart "gui/$(id -u)/$LABEL" 2>/dev/null || launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/$LABEL.plist"
-  for i in $(seq 1 50); do /usr/bin/curl -s -m 1 -o /dev/null "$URL/api/setup" && break; sleep 0.2; done
-fi
-PROFILE="$HOME/Library/Application Support/Sonde/window"
-for B in "Google Chrome" "Microsoft Edge" "Brave Browser" "Chromium"; do
-  if [ -d "/Applications/$B.app" ] || [ -d "$HOME/Applications/$B.app" ]; then
-    exec open -na "$B" --args --app="$URL" --user-data-dir="$PROFILE" --window-size=1480,940 --no-first-run --no-default-browser-check
-  fi
-done
-open "$URL"
-SH
+"$NODE" -e 'process.stdout.write(require(process.argv[1]).mac())' "$ROOT/versions/$VER/lib/launchers.js" > "$APP/Contents/MacOS/Sonde"
 chmod 755 "$APP/Contents/MacOS/Sonde"
 
 say "Sonde $VER est installée : ~/Applications/Sonde.app"
