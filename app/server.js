@@ -773,23 +773,24 @@ async function handler(req, res, opts = {}) {
       return;
     }
     // ---- assistant de premier lancement : opérateur, détection de la box, autorisation
-    if (p === '/api/brand/photo') {
+    if (p === '/api/brand/photo' || p === '/api/brand/logo') {
       const k = String(url.searchParams.get('k') || '');
-      if (!brands.PHOTOS[k]) { res.writeHead(404, SEC_HEADERS); return res.end(); }
-      try { const ph = await brands.photo(DATA_DIR, k, VERSION); res.writeHead(200, { ...SEC_HEADERS, 'content-type': ph.type, 'content-security-policy': "default-src 'none'", 'cache-control': 'max-age=31536000, immutable' }); return res.end(ph.buf); }
+      const isLogo = p.endsWith('logo');
+      if (!(isLogo ? brands.LOGOS : brands.PHOTOS)[k]) { res.writeHead(404, SEC_HEADERS); return res.end(); }
+      try { const ph = await (isLogo ? brands.logo : brands.photo)(DATA_DIR, k, VERSION); res.writeHead(200, { ...SEC_HEADERS, 'content-type': ph.type, 'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; sandbox", 'cache-control': 'max-age=31536000, immutable' }); return res.end(ph.buf); }
       catch { res.writeHead(404, SEC_HEADERS); return res.end(); }
     }
     if (p === '/api/setup' && req.method === 'GET') {
       const a = box ? await box.authState() : null;
       const pk = boxCfg ? brands.photoKey(boxCfg.box, boxCfg.model) : null;
-      return send(res, 200, { version: VERSION, os: platform.OS, osLabel: platform.label, hasNQ: platform.hasNQ, isps: boxes.ISPS.map(i => ({ ...i, ...brands.ISP_MEDIA[i.id], photoCredit: brands.credit(brands.ISP_MEDIA[i.id]?.photo) })), config: boxCfg, photo: pk, photoCredit: brands.credit(pk), configured: !!boxCfg && !!a?.ok, auth: a, features: box?.features || null, label: box?.label || null, gateway: await platform.gateway() });
+      return send(res, 200, { version: VERSION, os: platform.OS, osLabel: platform.label, hasNQ: platform.hasNQ, isps: boxes.ISPS.map(i => ({ ...i, logo: !!brands.LOGOS[i.id] })), config: boxCfg, photo: pk, photoLabel: brands.label(pk), configured: !!boxCfg && !!a?.ok, auth: a, features: box?.features || null, label: box?.label || null, gateway: await platform.gateway() });
     }
     if (p === '/api/setup/detect' && req.method === 'POST') {
       const b = await body(req);
       const gw = (/^\d{1,3}(\.\d{1,3}){3}$/.test(b.host || '') && boxHostOk(b.host) ? b.host : null) || await platform.gateway() || '192.168.1.1';
       const d = await boxes.detect(gw, String(b.isp || ''));
       const pk = brands.photoKey(d.box, d.model);
-      return send(res, 200, { ...d, photo: pk, photoCredit: brands.credit(pk) });
+      return send(res, 200, { ...d, photo: pk, photoLabel: brands.label(pk) });
     }
     if (p === '/api/setup/save' && req.method === 'POST') {
       const b = await body(req);
