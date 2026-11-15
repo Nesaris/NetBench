@@ -1,0 +1,106 @@
+# Installe Sonde sur Windows 10/11 (ou le met à jour ; -Uninstall pour le désinstaller).
+#   irm https://raw.githubusercontent.com/Nesaris/sonde/main/install/win.ps1 | iex
+# Rien n'est installé en dehors de ton profil, aucun droit administrateur n'est demandé.
+# Node.js vient de nodejs.org (empreinte SHA-256 vérifiée) et Sonde des releases GitHub
+# (signature Ed25519 du mainteneur vérifiée avant installation).
+param([switch]$Uninstall)
+$ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+
+$Repo = if ($env:SONDE_REPO) { $env:SONDE_REPO } else { 'Nesaris/sonde' }
+$PubKey = 'MCowBQYDK2VwAyEAY03Xgj+jmh+tZbBD0cI+qQuVwLH+L6/0qAGwyCFflE4='
+$Root = Join-Path $env:LOCALAPPDATA 'Sonde\app'
+$StartMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\Sonde.lnk'
+$Desktop = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Sonde.lnk'
+function Say($m) { Write-Host "› $m" -ForegroundColor Cyan }
+
+if ($Uninstall) {
+  Get-CimInstance Win32_Process -Filter "Name='node.exe'" | Where-Object { $_.CommandLine -like "*$Root*" } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }
+  Remove-Item -Recurse -Force $Root, $StartMenu, $Desktop -ErrorAction SilentlyContinue
+  Say "Sonde est désinstallée. Tes rapports et réglages restent dans $env:APPDATA\Sonde (supprime ce dossier pour tout effacer)."
+  return
+}
+
+$Tmp = Join-Path $env:TEMP ("sonde-" + [guid]::NewGuid())
+New-Item -ItemType Directory -Force -Path $Tmp, (Join-Path $Root 'versions') | Out-Null
+try {
+  # ---------------------------------------------------------------- Node.js
+  $na = if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { 'arm64' } else { 'x64' }
+  $base = 'https://nodejs.org/dist/latest-v22.x'
+  $sums = (Invoke-WebRequest -UseBasicParsing "$base/SHASUMS256.txt").Content -split "`n"
+  $line = $sums | Where-Object { $_ -match "node-v[0-9.]+-win-$na\.zip$" } | Select-Object -First 1
+  if (-not $line) { throw 'Version de Node introuvable' }
+  $sum, $file = ($line.Trim() -split '\s+')
+  $marker = Join-Path $Root 'node\.file'
+  if (-not (Test-Path $marker) -or (Get-Content $marker) -ne $file) {
+    Say "Téléchargement de Node.js ($file)"
+    $zip = Join-Path $Tmp $file
+    Invoke-WebRequest -UseBasicParsing "$base/$file" -OutFile $zip
+    if ((Get-FileHash -Algorithm SHA256 $zip).Hash.ToLower() -ne $sum.ToLower()) { throw 'Empreinte de Node.js incorrecte : téléchargement refusé' }
+    Expand-Archive -Force $zip (Join-Path $Tmp 'n')
+    $inner = Get-ChildItem (Join-Path $Tmp 'n') | Select-Object -First 1
+    Remove-Item -Recurse -Force (Join-Path $Root 'node') -ErrorAction SilentlyContinue
+    Move-Item $inner.FullName (Join-Path $Root 'node')
+    Set-Content -Path $marker -Value $file
+  }
+  $Node = Join-Path $Root 'node\node.exe'
+
+  # ---------------------------------------------------------------- Sonde (paquet signé)
+  Say 'Téléchargement de la dernière version de Sonde'
+  $rel = Invoke-RestMethod -UseBasicParsing -Headers @{ accept = 'application/vnd.github+json' } "https://api.github.com/repos/$Repo/releases/latest"
+  $ver = $rel.tag_name -replace '^v', ''
+  $url = "https://github.com/$Repo/releases/download/v$ver/sonde-app-$ver.json"
+  Invoke-WebRequest -UseBasicParsing $url -OutFile (Join-Path $Tmp 'app.json')
+  Invoke-WebRequest -UseBasicParsing "$url.sig" -OutFile (Join-Path $Tmp 'app.json.sig')
+  $env:PUB = $PubKey; $env:DEST = Join-Path $Root "versions\$ver"
+  $js = @'
+const c=require("crypto"),fs=require("fs"),path=require("path");
+const buf=fs.readFileSync(process.argv[1]);
+const pub="-----BEGIN PUBLIC KEY-----\n"+process.env.PUB+"\n-----END PUBLIC KEY-----";
+if(!c.verify(null,buf,c.createPublicKey(pub),Buffer.from(fs.readFileSync(process.argv[2],"utf8").trim(),"base64"))){console.error("Signature invalide : installation annulée.");process.exit(1)}
+const b=JSON.parse(buf), dest=process.env.DEST, tmp=dest+".tmp";
+fs.rmSync(tmp,{recursive:true,force:true});
+for(const [rel,b64] of Object.entries(b.files)){ const n=path.normalize(rel); if(path.isAbsolute(n)||n.startsWith("..")||!/^[\w./-]+$/.test(rel)) throw new Error("chemin interdit "+rel); const f=path.join(tmp,n); fs.mkdirSync(path.dirname(f),{recursive:true}); fs.writeFileSync(f,Buffer.from(b64,"base64")); }
+fs.rmSync(dest,{recursive:true,force:true}); fs.renameSync(tmp,dest);
+'@
+  $jsFile = Join-Path $Tmp 'unpack.js'; Set-Content -Path $jsFile -Value $js -Encoding UTF8
+  & $Node $jsFile (Join-Path $Tmp 'app.json') (Join-Path $Tmp 'app.json.sig')
+  if ($LASTEXITCODE -ne 0) { throw 'Paquet refusé' }
+  Say "Signature vérifiée (version $ver)"
+  if (Test-Path (Join-Path $Root 'current')) { Copy-Item (Join-Path $Root 'current') (Join-Path $Root 'previous') -Force }
+  Set-Content -Path (Join-Path $Root 'current') -Value $ver -NoNewline
+  Copy-Item (Join-Path $Root "versions\$ver\launcher.js") (Join-Path $Root 'launcher.js') -Force
+
+  # ---------------------------------------------------------------- lanceur (moteur caché + fenêtre Edge)
+  $vbs = @"
+' Démarre le moteur de Sonde s'il ne tourne pas, puis ouvre la fenêtre.
+Set sh = CreateObject("WScript.Shell")
+Function Up()
+  On Error Resume Next
+  Set x = CreateObject("MSXML2.ServerXMLHTTP.6.0")
+  x.setTimeouts 500, 500, 500, 500
+  x.Open "GET", "http://127.0.0.1:47800/api/setup", False
+  x.Send
+  Up = (Err.Number = 0 And x.Status = 200)
+End Function
+If Not Up() Then
+  sh.Run """$Node"" ""$Root\launcher.js""", 0, False
+  For i = 1 To 50
+    WScript.Sleep 200
+    If Up() Then Exit For
+  Next
+End If
+sh.Run "msedge --app=http://127.0.0.1:47800 --user-data-dir=""$env:LOCALAPPDATA\Sonde\window"" --window-size=1480,940 --no-first-run", 1, False
+"@
+  $vbsFile = Join-Path $Root 'Sonde.vbs'; Set-Content -Path $vbsFile -Value $vbs -Encoding Unicode
+  $ws = New-Object -ComObject WScript.Shell
+  foreach ($lnk in @($StartMenu, $Desktop)) {
+    $s = $ws.CreateShortcut($lnk); $s.TargetPath = "$env:WINDIR\System32\wscript.exe"; $s.Arguments = "`"$vbsFile`""
+    $ico = Join-Path $Root "versions\$ver\assets\icon.ico"; if (Test-Path $ico) { $s.IconLocation = $ico }
+    $s.Description = 'Sonde : tests du réseau de la maison'; $s.Save()
+  }
+  Say "Sonde $ver est installée (menu Démarrer et bureau)."
+  Say 'Les mises à jour suivantes s''installent toutes seules (Réglages → Mises à jour).'
+  Start-Process "$env:WINDIR\System32\wscript.exe" "`"$vbsFile`""
+} finally { Remove-Item -Recurse -Force $Tmp -ErrorAction SilentlyContinue }

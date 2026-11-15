@@ -1,0 +1,19 @@
+# Sonde Agent avec Docker Compose.
+# Le réseau « host » est nécessaire : l'agent doit voir l'adresse IP réelle de chaque appareil qui l'interroge.
+services:
+  sonde-agent:
+    build: .
+    image: sonde-agent:local
+    container_name: sonde-agent
+    network_mode: host
+    restart: unless-stopped
+    volumes:
+      - /var/lib/sonde-agent:/data
+    environment:
+      - SONDE_MIN_FREE_GB=1
+      # - SONDE_BOX=192.168.1.1        # adresse de la box si elle n'est pas détectée
+    cap_drop: [ALL]
+    cap_add: [NET_BIND_SERVICE]
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: [no-new-privileges:true]

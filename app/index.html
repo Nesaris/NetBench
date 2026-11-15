@@ -1,0 +1,1923 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sonde</title>
+<meta name="description" content="Banc de test du réseau de la maison : ping, débit, charge et ce que voit la box (Freebox, Livebox, SFR Box, Bbox).">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* Sonde — instrument de mesure.
+   Accent : cyan « trace d'oscilloscope », réservé aux mesures en cours et à l'action principale.
+   Typo : IBM Plex Sans (interface) + IBM Plex Mono (toutes les valeurs mesurées, chiffres tabulaires).
+   Mise en page : un rack d'appareils à gauche, une zone de lecture à droite. */
+:root{
+  --bg:#0d0e10; --panel:#141619; --panel-2:#1a1d21; --line:#25292f; --line-2:#30353c;
+  --text:#e8eaed; --text-2:#a3a9b2; --text-3:#6f7681;
+  --accent:#5cc8e8; --accent-ink:#06222b; --accent-dim:rgba(92,200,232,.14);
+  --ok:#7ccf7a; --warn:#f0b54a; --bad:#f26a5e;
+  --ok-dim:rgba(124,207,122,.13); --warn-dim:rgba(240,181,74,.13); --bad-dim:rgba(242,106,94,.14);
+  --s1:#5cc8e8; --s2:#ff8a65; --s3:#b9a3ff; --s4:#e8d08f; --s5:#7fe0c0; --s6:#f28dc0; --s7:#9fb4ff;
+  --r:6px; --r-lg:10px;
+  --sans:'IBM Plex Sans',-apple-system,BlinkMacSystemFont,sans-serif;
+  --mono:'IBM Plex Mono',ui-monospace,'SF Mono',Menlo,monospace;
+  /* échelle typographique 1.2 */
+  --t-xs:11px; --t-sm:12.5px; --t-md:14px; --t-lg:17px; --t-xl:21px; --t-2xl:30px; --t-3xl:44px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);font:400 var(--t-md)/1.45 var(--sans);-webkit-font-smoothing:antialiased;overflow:hidden}
+button,input,select{font:inherit;color:inherit}
+.mono,.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+
+/* ---------- structure */
+.app{display:grid;grid-template-columns:340px 1fr;grid-template-rows:52px 1fr;height:100vh}
+header{grid-column:1/-1;display:flex;align-items:center;gap:20px;padding:0 16px;border-bottom:1px solid var(--line);-webkit-app-region:drag;background:var(--bg)}
+header *{-webkit-app-region:no-drag}
+.brand{display:flex;align-items:center;gap:10px;font-weight:600;letter-spacing:.01em}
+.brand svg{display:block}
+.pill{display:inline-flex;align-items:center;gap:8px;height:26px;padding:0 10px;border:1px solid var(--line-2);border-radius:999px;font-size:var(--t-sm);color:var(--text-2);white-space:nowrap}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--text-3);flex:none}
+.dot.ok{background:var(--ok)} .dot.bad{background:var(--bad)} .dot.live{background:var(--accent);box-shadow:0 0 0 3px var(--accent-dim)}
+.hdr-rates{display:flex;gap:18px;margin-left:auto;font-size:var(--t-sm);color:var(--text-2)}
+.hdr-rates b{font:500 var(--t-md) var(--mono);color:var(--text);margin-left:6px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:32px;padding:0 14px;border-radius:var(--r);border:1px solid var(--line-2);background:var(--panel-2);cursor:pointer;font-size:var(--t-sm);font-weight:500;white-space:nowrap;transition:background .12s,border-color .12s}
+.btn:hover{background:#22262b;border-color:#3a4048}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{background:#79d4ef}
+.btn.danger{background:var(--bad-dim);border-color:rgba(242,106,94,.4);color:#ffb3ab}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--text-2)}
+.btn.ghost:hover{background:var(--panel-2);color:var(--text)}
+.btn.sm{height:26px;padding:0 9px;font-size:var(--t-xs)}
+
+/* ---------- rack d'appareils */
+aside{border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0;background:var(--bg)}
+.rack-head{padding:14px 14px 10px;display:flex;flex-direction:column;gap:10px;border-bottom:1px solid var(--line)}
+.rack-title{display:flex;align-items:baseline;justify-content:space-between}
+.rack-title h2{font-size:var(--t-md);font-weight:600}
+.rack-title span{font-size:var(--t-xs);color:var(--text-3)}
+.search{height:30px;width:100%;padding:0 10px;border-radius:var(--r);border:1px solid var(--line-2);background:var(--panel);font-size:var(--t-sm)}
+.search::placeholder{color:var(--text-3)}
+.quick{display:flex;gap:6px}
+.rack{overflow:auto;flex:1;padding:6px 0 20px}
+.grp{padding:12px 14px 4px;font-size:var(--t-xs);color:var(--text-3);display:flex;justify-content:space-between}
+.dev{display:grid;grid-template-columns:16px 1fr auto;gap:12px;align-items:center;padding:9px 14px 9px 12px;cursor:pointer;border-left:2px solid transparent}
+input[type=checkbox]{appearance:none;-webkit-appearance:none;width:15px;height:15px;border:1.5px solid var(--line-2);border-radius:4px;background:var(--panel);display:inline-grid;place-content:center;cursor:pointer;flex:none;margin:0}
+input[type=checkbox]:hover{border-color:#4a515b}
+input[type=checkbox]:checked{background:var(--accent);border-color:var(--accent)}
+input[type=checkbox]:checked::after{content:'';width:8px;height:5px;border-left:2px solid var(--accent-ink);border-bottom:2px solid var(--accent-ink);transform:rotate(-45deg) translate(1px,-1px)}
+input[type=checkbox]:disabled{opacity:.35;cursor:not-allowed}
+.bars{display:flex;align-items:flex-end;gap:2px;height:14px}
+.bars i{width:3px;background:var(--line-2);border-radius:1px}
+.bars i:nth-child(1){height:4px}.bars i:nth-child(2){height:7px}.bars i:nth-child(3){height:10px}.bars i:nth-child(4){height:13px}
+.bars.ok i.on{background:var(--ok)}.bars.warn i.on{background:var(--warn)}.bars.bad i.on{background:var(--bad)}
+.dev .side{display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+.dev .side .db{font:400 10px var(--mono);color:var(--text-3)}
+.dev .live{color:var(--accent)}
+.dev:hover{background:var(--panel)}
+.dev.sel{background:var(--panel);border-left-color:var(--accent)}
+.dev .nm{font-size:var(--t-md);font-weight:500;display:flex;align-items:center;gap:6px;min-width:0}
+.dev .nm span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dev .meta{font-size:var(--t-xs);color:var(--text-3);font-family:var(--mono);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dev .tr{font:400 var(--t-xs) var(--mono);color:var(--text-3);text-align:right;line-height:1.5}
+.dev .tr .act{color:var(--text-2)}
+.tag{font:500 10px var(--sans);padding:1px 6px;border-radius:4px;letter-spacing:.02em;flex:none}
+.tag.game{background:var(--warn-dim);color:var(--warn)}
+.tag.cons{background:var(--panel-2);color:var(--text-2);border:1px solid var(--line-2)}
+.sig.ok{color:var(--ok)} .sig.warn{color:var(--warn)} .sig.bad{color:var(--bad)}
+.rack-foot{border-top:1px solid var(--line);padding:10px 14px;font-size:var(--t-xs);color:var(--text-3)}
+
+/* ---------- zone principale */
+main{display:flex;flex-direction:column;min-height:0;min-width:0}
+nav.tabs{display:flex;gap:2px;padding:0 20px;border-bottom:1px solid var(--line);flex:none}
+nav.tabs button{background:none;border:0;padding:13px 12px 11px;font-size:var(--t-md);color:var(--text-2);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}
+nav.tabs button:hover{color:var(--text)}
+nav.tabs button[aria-selected=true]{color:var(--text);border-bottom-color:var(--accent);font-weight:500}
+nav.tabs .run{width:6px;height:6px;border-radius:50%;background:var(--accent);display:none;margin-left:7px;vertical-align:2px}
+nav.tabs .run.on{display:inline-block}
+.view{display:none;overflow:auto;padding:22px 24px 40px;flex:1}
+.view.on{display:block}
+.view-head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-bottom:18px;flex-wrap:wrap}
+.view-head h1{font-size:var(--t-xl);font-weight:600;letter-spacing:-.01em}
+.view-head p{color:var(--text-2);font-size:var(--t-sm);max-width:68ch;margin-top:4px}
+.controls{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg)}
+.panel-h{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--line);gap:12px}
+.panel-h h3{font-size:var(--t-sm);font-weight:600;color:var(--text)}
+.panel-h .sub{font-size:var(--t-xs);color:var(--text-3)}
+.panel-b{padding:14px 16px}
+.grid{display:grid;gap:14px}
+.g-2{grid-template-columns:1.6fr 1fr}
+.g-3{grid-template-columns:repeat(3,1fr)}
+.g-4{grid-template-columns:repeat(4,1fr)}
+@media (max-width:1250px){.g-4{grid-template-columns:repeat(2,1fr)}.g-3{grid-template-columns:1fr 1fr}.g-2{grid-template-columns:1fr}}
+
+/* lectures */
+.readout{padding:14px 16px}
+.readout .lb{font-size:var(--t-xs);color:var(--text-2);display:flex;align-items:center;gap:7px}
+.readout .v{font:500 var(--t-2xl)/1.1 var(--mono);margin-top:6px;letter-spacing:-.02em}
+.readout .v small{font-size:var(--t-md);color:var(--text-3);font-weight:400;margin-left:4px;letter-spacing:0}
+.readout .ft{font:400 var(--t-xs) var(--mono);color:var(--text-3);margin-top:6px}
+.readout.hero .v{font-size:var(--t-3xl)}
+.bar{height:4px;background:var(--line);border-radius:2px;margin-top:10px;overflow:hidden;position:relative}
+.bar i{position:absolute;inset:0 auto 0 0;background:var(--accent);border-radius:2px;transition:width .4s}
+.bar b{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--text-2)}
+
+.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;font-size:var(--t-sm)}
+.kv dt{color:var(--text-3)}
+.kv dd{font-family:var(--mono);text-align:right;color:var(--text)}
+
+canvas.chart{display:block;width:100%;height:240px}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:var(--t-xs);color:var(--text-2)}
+.legend i{display:inline-block;width:10px;height:2px;margin-right:6px;vertical-align:3px}
+
+table.t{width:100%;border-collapse:collapse;font-size:var(--t-sm)}
+table.t th{font-weight:500;color:var(--text-3);font-size:var(--t-xs);text-align:right;padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+table.t th:first-child,table.t td:first-child{text-align:left}
+table.t td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:right;font-family:var(--mono);white-space:nowrap}
+table.t td:first-child{font-family:var(--sans);font-weight:500}
+table.t tr:last-child td{border-bottom:0}
+.c-ok{color:var(--ok)} .c-warn{color:var(--warn)} .c-bad{color:var(--bad)} .c-dim{color:var(--text-3)}
+.sw{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:8px;vertical-align:0}
+
+.seg{display:inline-flex;border:1px solid var(--line-2);border-radius:var(--r);overflow:hidden;height:32px}
+.seg button{white-space:nowrap;background:var(--panel);border:0;padding:0 12px;font-size:var(--t-sm);color:var(--text-2);cursor:pointer;border-right:1px solid var(--line-2)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed=true]{background:var(--panel-2);color:var(--text);box-shadow:inset 0 -2px 0 var(--accent)}
+label.chk{display:inline-flex;align-items:center;gap:8px;font-size:var(--t-sm);color:var(--text-2);cursor:pointer}
+label.chk input{accent-color:var(--accent)}
+.field{display:inline-flex;align-items:center;gap:8px;font-size:var(--t-sm);color:var(--text-2)}
+.field select,.field input[type=number]{height:32px;border-radius:var(--r);border:1px solid var(--line-2);background:var(--panel);padding:0 8px}
+.field input[type=range]{accent-color:var(--accent);width:120px}
+
+.note{font-size:var(--t-sm);color:var(--text-2);line-height:1.55;max-width:75ch}
+.note b{color:var(--text);font-weight:500}
+.callout{border:1px solid var(--line-2);border-left:3px solid var(--warn);background:var(--panel);border-radius:var(--r);padding:10px 14px;font-size:var(--t-sm);color:var(--text-2)}
+.callout.info{border-left-color:var(--accent)}
+.empty{padding:40px 16px;text-align:center;color:var(--text-3);font-size:var(--t-sm)}
+
+/* radios / ports */
+.rows{display:flex;flex-direction:column}
+.row{display:grid;grid-template-columns:70px 1fr auto;gap:12px;align-items:center;padding:8px 0;border-bottom:1px solid var(--line);font-size:var(--t-sm)}
+.row:last-child{border-bottom:0}
+.row .k{font-family:var(--mono);color:var(--text)}
+.row .d{color:var(--text-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .e{font-family:var(--mono);color:var(--text-3);font-size:var(--t-xs)}
+
+/* étapes du test complet */
+.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid var(--line);border-radius:var(--r-lg);overflow:hidden;margin-bottom:16px}
+.step{padding:14px 16px;border-right:1px solid var(--line);background:var(--panel)}
+.step:last-child{border-right:0}
+.step .n{font:500 var(--t-xs) var(--mono);color:var(--text-3)}
+.step .l{font-size:var(--t-sm);font-weight:500;margin-top:4px}
+.step .s{font-size:var(--t-xs);color:var(--text-3);margin-top:2px}
+.step.run{background:var(--panel-2);box-shadow:inset 0 2px 0 var(--accent)}
+.step.run .n{color:var(--accent)}
+.step.done .n{color:var(--ok)}
+.verdict{display:flex;flex-direction:column;gap:8px}
+.vd{display:grid;grid-template-columns:8px 1fr;gap:12px;align-items:baseline;font-size:var(--t-sm);color:var(--text);line-height:1.5}
+.vd i{width:8px;height:8px;border-radius:50%;background:var(--text-3);transform:translateY(-1px)}
+.vd.ok i{background:var(--ok)} .vd.warn i{background:var(--warn)} .vd.bad i{background:var(--bad)} .vd.info i{background:var(--accent)}
+
+/* consoles en direct + journal */
+.cpills{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.cpill{border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;background:var(--panel-2)}
+.cpill .n{font-size:var(--t-xs);color:var(--text-2);display:flex;align-items:center;gap:7px}
+.cpill .v{font:500 var(--t-xl)/1.15 var(--mono);margin-top:4px}
+.cpill .v small{font-size:var(--t-sm);color:var(--text-3);font-weight:400;margin-left:3px}
+.cpill .f{font:400 var(--t-xs) var(--mono);color:var(--text-3);margin-top:3px}
+.evlist{max-height:372px;overflow:auto}
+.ev{display:grid;grid-template-columns:62px 1fr auto;gap:12px;padding:10px 16px;border-bottom:1px solid var(--line);align-items:start}
+.ev:last-child{border-bottom:0}
+.ev .tm{font:400 var(--t-xs) var(--mono);color:var(--text-3);line-height:1.4}
+.ev .w{font-size:var(--t-sm);font-weight:500}
+.ev .c{font-size:var(--t-xs);color:var(--text-2);margin-top:2px;line-height:1.45}
+.ev .pk{font:500 var(--t-md) var(--mono);text-align:right}
+.ev .pk small{display:block;font-size:10px;color:var(--text-3);font-weight:400}
+.ev.noise{opacity:.55}
+
+/* tableau des appareils */
+.quicksort{display:flex;gap:6px;flex-wrap:wrap}
+table.dt th{cursor:pointer;user-select:none}
+table.dt th:hover{color:var(--text)}
+table.dt th.on{color:var(--accent)}
+table.dt th.on::after{content:attr(data-dir);margin-left:4px}
+table.dt td{vertical-align:middle}
+table.dt td.nmc{font-family:var(--sans);max-width:240px}
+table.dt td.nmc .a{display:flex;align-items:center;gap:8px;min-width:0}
+table.dt td.nmc .a span.nn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+table.dt td.nmc .b{font:400 var(--t-xs) var(--mono);color:var(--text-3);margin-top:1px}
+.tb{display:flex;align-items:center;justify-content:flex-end;gap:8px}
+.tb i{display:block;height:4px;border-radius:2px;background:var(--accent);min-width:2px}
+.tb.up i{background:var(--s2)}
+table.dt tr.sel td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
+
+/* services */
+.gate{max-width:440px;margin:6vh auto 0}
+.gate h2{font-size:var(--t-lg);font-weight:600}
+.gate p{color:var(--text-2);font-size:var(--t-sm);margin:8px 0 14px;line-height:1.55}
+.gate label{display:block;font-size:var(--t-xs);color:var(--text-2);margin:10px 0 4px}
+.gate input{height:36px;width:100%;border-radius:var(--r);border:1px solid var(--line-2);background:var(--panel);padding:0 10px;font-size:var(--t-md)}
+.gate .err{color:var(--bad);font-size:var(--t-sm);margin-top:10px;min-height:1.4em}
+.svc{display:grid;grid-template-columns:40px minmax(160px,1.2fr) minmax(140px,1fr) 90px minmax(200px,1.6fr);gap:14px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);cursor:pointer}
+.svc:last-child{border-bottom:0}
+.svc:hover{background:var(--panel-2)}
+.logo{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;font:600 16px var(--sans);color:#fff;flex:none}
+.logo img{width:22px;height:22px;display:block}
+.svc .n{font-weight:600;font-size:var(--t-md);display:flex;align-items:center;gap:8px}
+.svc .k{font-size:var(--t-xs);color:var(--text-3);margin-top:2px}
+.svc .bar2{height:6px;border-radius:3px;background:var(--line);overflow:hidden}
+.svc .bar2 i{display:block;height:100%;border-radius:3px}
+.svc .vol{font:500 var(--t-md) var(--mono);text-align:right}
+.who{display:flex;flex-wrap:wrap;gap:5px}
+.who span{font-size:var(--t-xs);padding:2px 8px;border-radius:999px;background:var(--panel-2);border:1px solid var(--line-2);color:var(--text-2);white-space:nowrap}
+.who span.on{border-color:rgba(124,207,122,.5);color:var(--text)}
+.who span.on::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--ok);margin-right:6px;vertical-align:1px}
+.svc-det{grid-column:2/-1;font:400 var(--t-xs) var(--mono);color:var(--text-3);line-height:1.7;display:none}
+.svc.open .svc-det{display:block}
+
+/* flux en direct */
+.feed{max-height:calc(100vh - 330px);min-height:300px;overflow:auto}
+.fr{display:grid;grid-template-columns:78px minmax(130px,190px) 26px minmax(0,1fr) minmax(120px,200px);gap:12px;align-items:center;padding:7px 16px;border-bottom:1px solid var(--line);font-size:var(--t-sm)}
+.fr .tm{font:400 var(--t-xs) var(--mono);color:var(--text-3)}
+.fr .dv{display:flex;align-items:center;gap:7px;min-width:0;color:var(--text-2)}
+.fr .dv span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fr .dv i{width:7px;height:7px;border-radius:50%;flex:none}
+.fr img.fav{width:20px;height:20px;border-radius:5px;background:#fff;display:block}
+.favw{position:relative;width:20px;height:20px;display:block}
+.favw b{display:none;position:absolute;inset:0;border-radius:5px;background:var(--bg);color:#fff;font:600 11px var(--sans);place-items:center}
+.favw.nofav img{display:none}.favw.nofav b{display:grid}
+.fr .dm{font-family:var(--mono);font-size:var(--t-xs);color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fr .dm b{color:var(--text);font-weight:500}
+.fr .sv{display:flex;align-items:center;gap:6px;justify-content:flex-end;font-size:var(--t-xs);color:var(--text-2);white-space:nowrap;overflow:hidden}
+.fr.spawn{animation:spawn .9s ease-out}
+@keyframes spawn{from{background:var(--accent-dim);transform:translateY(-4px);opacity:.3}to{background:transparent;transform:none;opacity:1}}
+
+.fr{cursor:pointer}.fr:hover{background:var(--panel-2)}
+.fr.blk .dm b,.fr.blk .dm{color:var(--bad)}
+.menu{position:fixed;z-index:70;background:var(--panel-2);border:1px solid var(--line-2);border-radius:var(--r);padding:4px;min-width:280px;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.menu button{display:block;width:100%;text-align:left;background:none;border:0;padding:8px 10px;border-radius:5px;font-size:var(--t-sm);cursor:pointer;color:var(--text)}
+.menu button:hover{background:var(--line)}
+.menu .h{font:400 var(--t-xs) var(--mono);color:var(--text-3);padding:6px 10px 4px}
+.bkr{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;padding:9px 16px;border-bottom:1px solid var(--line);font-size:var(--t-sm)}
+.bkr:last-child{border-bottom:0}
+.bkr .m{font-size:var(--t-xs);color:var(--text-3);margin-top:2px}
+
+/* scan */
+.scan-sum{display:grid;grid-template-columns:1.2fr repeat(4,1fr);margin-bottom:14px}
+.scan-sum>div{padding:14px 16px;border-right:1px solid var(--line)}
+.scan-sum>div:last-child{border-right:0}
+.scan-sum .lb{font-size:var(--t-xs);color:var(--text-2)}
+.scan-sum .v{font:500 var(--t-2xl)/1.15 var(--mono);margin-top:4px}
+.scan-sum .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.chip{font:500 10.5px var(--sans);padding:2px 7px;border-radius:4px;background:var(--panel-2);color:var(--text-2);border:1px solid var(--line-2)}
+.chip.ok{background:var(--ok-dim);color:var(--ok);border-color:transparent}
+.chip.bad{background:var(--bad-dim);color:var(--bad);border-color:transparent}
+.chip.warn{background:var(--warn-dim);color:var(--warn);border-color:transparent}
+.chip.acc{background:var(--accent-dim);color:var(--accent);border-color:transparent}
+details.sec{margin-top:14px}
+details.sec>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:11px 16px;background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);font-size:var(--t-md);font-weight:500}
+details.sec>summary::-webkit-details-marker{display:none}
+details.sec>summary::after{content:'';width:8px;height:8px;border-right:1.5px solid var(--text-3);border-bottom:1.5px solid var(--text-3);transform:rotate(45deg) translateY(-3px)}
+details.sec[open]>summary::after{transform:rotate(-135deg) translateY(-1px)}
+details.sec>summary .c{color:var(--text-3);font:400 var(--t-sm) var(--mono);margin-left:8px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;margin-top:10px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);padding:12px 14px;display:grid;grid-template-columns:38px 1fr;gap:12px;cursor:pointer;position:relative}
+.card:hover{border-color:var(--line-2)}
+.card.sel{border-color:rgba(92,200,232,.55);box-shadow:inset 0 0 0 1px rgba(92,200,232,.25)}
+.card .ic{width:38px;height:38px;border-radius:8px;background:var(--panel-2);border:1px solid var(--line-2);display:grid;place-items:center;color:var(--text-2)}
+.card .ic svg{width:20px;height:20px}
+.card .ty{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.card .nm{font-weight:600;font-size:var(--t-md);margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.card .ip{font:400 var(--t-xs) var(--mono);color:var(--text-3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.card .ms{display:flex;gap:12px;margin-top:8px;font:400 var(--t-xs) var(--mono);color:var(--text-2);flex-wrap:wrap}
+.card .ms b{font-weight:500;color:var(--text)}
+.card.gone{opacity:.6;cursor:default}
+
+/* comparer */
+.cmp{display:grid;grid-template-columns:300px 1fr;gap:14px;align-items:start}
+@media (max-width:1150px){.cmp{grid-template-columns:1fr}}
+.rep{display:grid;grid-template-columns:16px 10px 1fr auto;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);cursor:pointer}
+.rep:hover{background:var(--panel-2)}
+.rep .sw{width:10px;height:10px;border-radius:3px;margin:0}
+.rep .n{font-weight:500;font-size:var(--t-md);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rep .d{font:400 var(--t-xs) var(--mono);color:var(--text-3);margin-top:1px}
+.rep .acts{display:flex;gap:2px;opacity:0;transition:opacity .12s}
+.rep:hover .acts,.rep:focus-within .acts{opacity:1}
+.ib{width:24px;height:24px;border-radius:5px;border:0;background:transparent;color:var(--text-3);cursor:pointer;display:grid;place-items:center}
+.ib:hover{background:var(--line);color:var(--text)}
+.ib svg{width:14px;height:14px}
+.chipbtn{font:500 var(--t-xs) var(--sans);height:26px;padding:0 10px;border-radius:999px;border:1px solid var(--line-2);background:transparent;color:var(--text-2);cursor:pointer}
+.chipbtn[aria-pressed=true]{background:var(--panel-2);color:var(--text);border-color:#4a515b}
+.delta{font-size:10.5px;margin-left:6px}
+input.txt{height:34px;width:100%;border-radius:var(--r);border:1px solid var(--line-2);background:var(--bg);padding:0 10px;font-size:var(--t-md);margin-top:14px}
+
+/* modale */
+.modal{position:fixed;inset:0;background:rgba(5,6,8,.72);display:none;align-items:center;justify-content:center;z-index:50}
+.modal.on{display:flex}
+.dlg{width:min(480px,92vw);background:var(--panel);border:1px solid var(--line-2);border-radius:var(--r-lg);padding:20px 22px}
+.dlg h2{font-size:var(--t-lg);font-weight:600}
+.dlg p{color:var(--text-2);font-size:var(--t-sm);margin-top:8px;line-height:1.55}
+.dlg ul{list-style:none;margin:14px 0;border:1px solid var(--line);border-radius:var(--r)}
+.dlg li{display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid var(--line);font-size:var(--t-sm)}
+.dlg li:last-child{border-bottom:0}
+.dlg .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:16px}
+
+.auth{max-width:620px;margin:7vh auto;text-align:left}
+.isp{display:grid;gap:8px;margin:14px 0 18px}
+.isp button{display:grid;grid-template-columns:1fr auto;gap:2px 12px;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:var(--r-lg);padding:12px 14px;color:var(--text);cursor:pointer;font:inherit}
+.isp button:hover{border-color:var(--line-2)}
+.isp button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.isp button[aria-pressed=true]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.isp b{font-weight:600}.isp .m{grid-column:1/-1;color:var(--text-3);font-size:var(--t-xs)}
+.wsteps{display:flex;gap:6px;margin-bottom:18px;color:var(--text-3);font-size:var(--t-xs)}
+.wsteps span{padding:3px 8px;border:1px solid var(--line);border-radius:99px}.wsteps span.on{color:var(--text);border-color:var(--accent)}
+.fld{display:grid;gap:6px;margin:0 0 12px}.fld label{font-size:var(--t-sm);color:var(--text-2)}
+.fld input{height:36px;background:var(--panel);border:1px solid var(--line-2);border-radius:var(--r);color:var(--text);padding:0 10px;font:inherit}
+.fld input:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.setrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:10px 0}
+.flist{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+body.no-signal #dTable :is(th,td):nth-child(3){display:none}
+body.no-rate #dTable :is(th,td):is(:nth-child(5),:nth-child(6),:nth-child(7)){display:none}
+body.no-block [data-need~=block],body.no-rename [data-need~=rename],body.no-nq [data-need~=nq],body.no-repeater [data-need~=repeater],body.no-ports [data-need~=ports],body.no-wanrate [data-need~=wanrate]{display:none!important}
+.auth h1{font-size:var(--t-xl);font-weight:600}
+.auth p{color:var(--text-2);margin:10px 0 18px;line-height:1.55}
+
+.toast{position:fixed;bottom:18px;right:18px;background:var(--panel-2);border:1px solid var(--line-2);border-radius:var(--r);padding:10px 14px;font-size:var(--t-sm);max-width:420px;z-index:60;display:none}
+.toast.on{display:block}
+.toast.err{border-left:3px solid var(--bad)}
+.spin{width:12px;height:12px;border:2px solid var(--line-2);border-top-color:var(--accent);border-radius:50%;animation:sp .8s linear infinite;display:inline-block}
+@keyframes sp{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:#2a2e34;border-radius:10px;border:3px solid var(--bg)}::-webkit-scrollbar-track{background:transparent}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">
+      <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true"><rect x="1" y="1" width="20" height="20" rx="5" fill="none" stroke="#30353c"/><path d="M4 13h3l2-6 3 9 2-5h4" fill="none" stroke="#5cc8e8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Sonde
+    </div>
+    <span class="pill" id="pFibre"><span class="dot"></span>Fibre…</span>
+    <span class="pill" id="pLive" title="Liaison avec le moteur de mesure"><span class="dot"></span>Hors ligne</span>
+    <div class="hdr-rates">
+      <span>Box reçoit<b id="hDown">—</b></span>
+      <span>Box envoie<b id="hUp">—</b></span>
+    </div>
+    <span class="chip" id="updChip" style="display:none;cursor:pointer" title="Une nouvelle version de Sonde est disponible"></span>
+    <button class="btn ghost sm" id="bSet" title="Box, opérateur et mises à jour">Réglages</button>
+    <button class="btn ghost sm" id="bQuit" title="Arrête les tests et ferme le moteur">Quitter</button>
+  </header>
+
+  <aside>
+    <div class="rack-head">
+      <div class="rack-title"><h2>Appareils</h2><span id="selCount">0 sélectionné</span></div>
+      <input class="search" id="q" placeholder="Filtrer par nom ou IP" aria-label="Filtrer les appareils">
+      <div class="quick">
+        <button class="btn sm" data-q="consoles">Consoles</button>
+        <button class="btn sm" data-q="all">Tout</button>
+        <button class="btn sm" data-q="none">Aucun</button>
+      </div>
+    </div>
+    <div class="rack" id="rack"><div class="empty">Lecture de la box…</div></div>
+    <div class="rack-foot" id="rackFoot">Les appareils cochés sont utilisés par Ping, Débit et Test complet.</div>
+  </aside>
+
+  <main>
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-v="live" aria-selected="true">Direct</button>
+      <button role="tab" data-v="devs" aria-selected="false">Appareils</button>
+      <button role="tab" data-v="svc" aria-selected="false">Services</button>
+      <button role="tab" data-v="scan" aria-selected="false">Scan<span class="run" id="rScan"></span></button>
+      <button role="tab" data-v="ping" aria-selected="false">Ping<span class="run" id="rPing"></span></button>
+      <button role="tab" data-v="load" aria-selected="false">Débit et charge<span class="run" id="rLoad"></span></button>
+      <button role="tab" data-v="full" aria-selected="false">Test complet<span class="run" id="rFull"></span></button>
+      <button role="tab" data-v="cmp" aria-selected="false">Comparer</button>
+      <button role="tab" data-v="hist" aria-selected="false">Historique</button>
+    </nav>
+
+    <div class="callout" id="scanWarn" style="display:none;margin:14px 24px 0"></div>
+    <!-- DIRECT -->
+    <section class="view on" id="v-live">
+      <div class="grid g-2">
+        <div class="panel">
+          <div class="panel-h"><h3>Trafic de la fibre, en direct</h3><div class="legend"><span><i style="background:var(--s1)"></i>Reçu par la box</span><span><i style="background:var(--s2)"></i>Envoyé</span></div></div>
+          <div class="panel-b"><canvas class="chart" id="cWan"></canvas></div>
+        </div>
+        <div class="grid" style="grid-template-rows:auto auto">
+          <div class="panel readout hero">
+            <div class="lb">La box reçoit maintenant</div>
+            <div class="v" id="lDown">—</div>
+            <div class="bar"><i id="lDownBar" style="width:0"></i></div>
+            <div class="ft" id="lDownFt">sur — possibles · pic de la session —</div>
+          </div>
+          <div class="panel readout">
+            <div class="lb">La box envoie maintenant</div>
+            <div class="v" id="lUp">—</div>
+            <div class="bar"><i id="lUpBar" style="width:0;background:var(--s2)"></i></div>
+            <div class="ft" id="lUpFt">—</div>
+          </div>
+        </div>
+      </div>
+      <div class="grid g-2" style="margin-top:14px">
+        <div class="panel">
+          <div class="panel-h"><h3>Consoles en direct</h3><span class="sub" id="consSub">ping depuis le Mac, 4 fois par seconde · pics du Wi‑Fi du Mac retirés</span></div>
+          <div class="panel-b">
+            <div class="cpills" id="consPills"></div>
+            <canvas class="chart" id="cCons" style="height:220px;margin-top:12px"></canvas>
+            <div class="legend" id="consLegend" style="margin-top:8px"></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-h"><h3>Journal des pics</h3><span class="sub" id="evCount">console au‑dessus de 60 ms ou ping perdu</span></div>
+          <div class="evlist" id="evList"><div class="empty">Aucun pic enregistré pour l'instant.</div></div>
+        </div>
+      </div>
+      <div class="grid g-4" style="margin-top:14px">
+        <div class="panel"><div class="panel-h"><h3>Box</h3><span class="sub" id="boxModel"></span></div><div class="panel-b"><dl class="kv" id="kvBox"></dl></div></div>
+        <div class="panel"><div class="panel-h"><h3>Wi‑Fi de la box</h3><span class="sub" id="psv"></span></div><div class="panel-b rows" id="radios"></div></div>
+        <div class="panel" data-need="repeater"><div class="panel-h"><h3>Répéteur</h3><span class="sub" id="repName"></span></div><div class="panel-b"><dl class="kv" id="kvRep"></dl></div></div>
+        <div class="panel"><div class="panel-h"><h3>Ce Mac</h3><span class="sub" id="macIf"></span></div><div class="panel-b"><dl class="kv" id="kvMac"></dl></div></div>
+      </div>
+      <div class="panel" style="margin-top:14px" data-need="ports">
+        <div class="panel-h"><h3>Ports de la box</h3><span class="sub">vitesse négociée avec l'appareil branché</span></div>
+        <div class="panel-b rows" id="ports"></div>
+      </div>
+    </section>
+
+    <!-- APPAREILS -->
+    <section class="view" id="v-devs">
+      <div class="view-head">
+        <div>
+          <h1>Tous les appareils</h1>
+          <p>Mis à jour chaque seconde. Clique sur un en-tête de colonne pour trier, une deuxième fois pour inverser. Le ping est mesuré en continu depuis le Mac (moyenne et max sur 30 s).</p>
+        </div>
+        <div class="controls">
+          <button class="btn" id="bNames" data-need="rename" title="Propose un nom pour chaque appareil à partir de ce qu'il annonce sur le réseau">Noms automatiques</button>
+          <input class="search" id="dq" placeholder="Filtrer" style="width:180px;height:32px" aria-label="Filtrer">
+          <div class="seg" id="dVia" role="group" aria-label="Connexion"><button data-f="all" aria-pressed="true">Tous</button><button data-f="wifi" aria-pressed="false">Wi‑Fi</button><button data-f="cable" aria-pressed="false">Câble</button></div>
+        </div>
+      </div>
+      <div class="quicksort" id="dQuick">
+        <button class="chipbtn" data-s="down:desc">Qui consomme le plus</button>
+        <button class="chipbtn" data-s="vol:desc">Plus gros volume</button>
+        <button class="chipbtn" data-s="pavg:desc">Pire ping</button>
+        <button class="chipbtn" data-s="pavg:asc">Meilleur ping</button>
+        <button class="chipbtn" data-s="loss:desc">Plus de pertes</button>
+        <button class="chipbtn" data-s="signal:desc">Meilleur signal</button>
+        <button class="chipbtn" data-s="signal:asc">Pire signal</button>
+        <button class="chipbtn" data-s="link:desc">Lien le plus rapide</button>
+      </div>
+      <div id="prioBar" style="display:none;margin-top:12px;padding:10px 14px;border:1px solid var(--accent);background:var(--accent-dim);border-radius:var(--r);align-items:center;gap:12px;flex-wrap:wrap"></div>
+      <div class="panel" style="margin-top:12px"><div style="overflow:auto"><table class="t dt" id="dTable"><thead></thead><tbody></tbody></table></div></div>
+      <p class="note" id="dFoot" style="margin-top:10px;font-size:var(--t-xs)"></p>
+    </section>
+
+    <!-- SERVICES -->
+    <section class="view" id="v-svc">
+      <div class="view-head">
+        <div>
+          <h1>Services et sites</h1>
+          <p>Quels services sont utilisés à la maison, combien ils consomment et qui est dessus. Le volume par service est une estimation : la box donne le trafic de chaque appareil, et l'agent le répartit entre les services que cet appareil contacte.</p>
+        </div>
+        <div class="controls" id="svcCtl" style="display:none">
+          <div class="seg" id="svcRange" role="group" aria-label="Période"><button data-r="1h" aria-pressed="false">1 h</button><button data-r="24h" aria-pressed="true">24 h</button><button data-r="7j" aria-pressed="false">7 j</button><button data-r="30j" aria-pressed="false">30 j</button><button data-r="1an" aria-pressed="false">1 an</button></div>
+          <button class="btn ghost sm" id="svcOut">Se déconnecter</button>
+        </div>
+      </div>
+      <div id="svcGate"></div>
+      <div id="svcMain" style="display:none">
+        <div class="seg" id="svcView" role="group" aria-label="Vue" style="margin-bottom:14px"><button data-w="live" aria-pressed="true">En direct</button><button data-w="sum" aria-pressed="false">Par service</button><button data-w="blk" aria-pressed="false">Blocages<span class="mono" id="blkCount" style="margin-left:6px;color:var(--text-3)"></span></button><button data-w="alr" aria-pressed="false">Alertes</button></div>
+        <div id="svcLive">
+          <div class="panel">
+            <div class="panel-h" style="flex-wrap:wrap">
+              <div class="controls">
+                <button class="btn sm" id="lvPause">Pause</button>
+                <select class="search" id="lvDev" style="width:auto;height:28px;font-size:var(--t-xs)" aria-label="Appareil"><option value="">Tous les appareils</option></select>
+                <input class="search" id="lvQ" placeholder="Filtrer un domaine" style="width:180px;height:28px;font-size:var(--t-xs)" aria-label="Filtrer un domaine">
+                <label class="chk" style="font-size:var(--t-xs)"><input type="checkbox" id="lvNoise" checked> Masquer le bruit système (Apple, Google, Microsoft, CDN…)</label>
+              </div>
+              <span class="sub mono" id="lvRate">en attente de requêtes…</span>
+            </div>
+            <div class="feed" id="lvFeed"><div class="empty">Les requêtes s'affichent ici dès qu'un appareil contacte un site ou une application.</div></div>
+            <div class="panel-b" style="border-top:1px solid var(--line);display:flex;justify-content:center"><button class="btn sm" id="lvMore">Afficher plus ancien</button></div>
+          </div>
+        </div>
+        <div id="svcBlk" style="display:none">
+          <div class="grid g-2">
+            <div class="panel">
+              <div class="panel-h"><h3>Sites bloqués</h3><span class="sub">le DNS de la maison répond « n'existe pas »</span></div>
+              <div class="panel-b controls" style="border-bottom:1px solid var(--line)">
+                <input class="search" id="bkDom" placeholder="tiktok.com" style="width:200px;height:32px" aria-label="Site à bloquer">
+                <select class="search" id="bkWho" style="width:auto;height:32px" aria-label="Pour qui"><option value="">Pour tout le monde</option></select>
+                <button class="btn primary" id="bkAdd">Bloquer ce site</button>
+              </div>
+              <div id="bkList"></div>
+            </div>
+            <div class="panel">
+              <div class="panel-h"><h3>Appareils bloqués</h3><span class="sub">refusés sur le Wi‑Fi de la box</span></div>
+              <div id="bdList"></div>
+              <div class="panel-b"><p class="note" style="font-size:var(--t-xs)">Pour bloquer un appareil : onglet Appareils, bouton « Bloquer » sur sa ligne, ou depuis le flux en direct. Les appareils en câble, le répéteur, la VM et ce Mac ne peuvent pas être bloqués.</p></div>
+            </div>
+          </div>
+          <p class="note" style="margin-top:12px;font-size:var(--t-xs)">Limites : un appareil peut contourner un blocage de site s'il utilise son propre DNS chiffré (navigateur avec « DNS sécurisé », VPN, Relais privé iCloud) ou le DNS IPv6 de la box. Pour une application (TikTok, Fortnite…), bloque le service entier depuis le flux en direct plutôt qu'un seul domaine.</p>
+        </div>
+        <div id="svcAlr" style="display:none">
+          <div class="grid g-2">
+            <div class="grid" style="align-content:start">
+              <div class="panel">
+                <div class="panel-h"><h3>Salon Discord</h3><span class="sub" id="alWh"></span></div>
+                <div class="panel-b">
+                  <p class="note" style="font-size:var(--t-xs);margin-bottom:10px">Dans Discord : paramètres du salon → Intégrations → Webhooks → Nouveau webhook → Copier l'URL du webhook, puis colle‑la ici. Elle reste dans la VM, jamais affichée en entier.</p>
+                  <div class="controls"><input class="search" id="alUrl" type="password" placeholder="https://discord.com/api/webhooks/…" style="flex:1;min-width:260px;height:32px" autocomplete="off" aria-label="URL du webhook"><button class="btn primary" id="alSave">Enregistrer</button><button class="btn" id="alTest">Envoyer un test</button></div>
+                </div>
+              </div>
+              <div class="panel">
+                <div class="panel-h"><h3>Bot Telegram</h3><span class="sub" id="tgSt"></span></div>
+                <div class="panel-b">
+                  <p class="note" style="font-size:var(--t-xs);margin-bottom:10px">1. Dans Telegram, écris à <b>@BotFather</b> : <span class="mono">/newbot</span>, choisis un nom, il te donne un jeton (123456789:ABC…). 2. Colle le jeton ici et enregistre. 3. Envoie « bonjour » à ton bot (ou ajoute‑le dans un groupe et écris un message), puis clique « Détecter la discussion ». Le jeton reste dans la VM.</p>
+                  <div class="controls"><input class="search" id="tgTok" type="password" placeholder="123456789:ABC…" style="flex:1;min-width:220px;height:32px" autocomplete="off" aria-label="Jeton du bot"><button class="btn primary" id="tgSave">Enregistrer</button><button class="btn" id="tgDet">Détecter la discussion</button></div>
+                </div>
+              </div>
+              <div class="panel">
+                <div class="panel-h"><h3>Surcharge réseau</h3></div>
+                <div class="panel-b controls">
+                  <label class="chk"><input type="checkbox" id="alOv"> Alerter quand un appareil consomme plus de</label>
+                  <label class="field"><input type="number" id="alMb" min="5" max="8000" style="width:80px"> Mb/s</label>
+                  <label class="field">pendant <input type="number" id="alSec" min="5" max="600" style="width:64px"> s</label>
+                  <label class="field">Pas plus d'une alerte identique toutes les <input type="number" id="alCd" min="1" max="240" style="width:56px"> min</label>
+                  <button class="btn" id="alOvSave">Enregistrer</button>
+                </div>
+              </div>
+              <div class="panel">
+                <div class="panel-h"><h3>Sites et services surveillés</h3><span class="sub">un message dès qu'ils sont consultés, avec qui</span></div>
+                <div class="panel-b controls" style="border-bottom:1px solid var(--line)">
+                  <select class="search" id="alSvc" style="width:auto;height:32px" aria-label="Service"><option value="">Un site précis…</option></select>
+                  <input class="search" id="alDom" placeholder="exemple.com" style="width:160px;height:32px" aria-label="Site">
+                  <select class="search" id="alWho" style="width:auto;height:32px" aria-label="Appareil"><option value="">N'importe quel appareil</option></select>
+                  <button class="btn primary" id="alAdd">Ajouter</button>
+                </div>
+                <div id="alRules"></div>
+              </div>
+            </div>
+            <div class="panel"><div class="panel-h"><h3>Dernières alertes</h3></div><div id="alLog"></div></div>
+          </div>
+        </div>
+        <div id="svcSumView" style="display:none">
+        <div class="panel scan-sum" id="svcSum" style="grid-template-columns:repeat(4,1fr)"></div>
+        <div class="panel"><div id="svcList"></div></div>
+        </div>
+        <p class="note" id="svcFoot" style="margin-top:10px;font-size:var(--t-xs)"></p>
+      </div>
+    </section>
+
+    <!-- SCAN -->
+    <section class="view" id="v-scan">
+      <div class="view-head">
+        <div>
+          <h1>Scan des appareils</h1>
+          <p>Relevé de tous les appareils connectés, 5 secondes de ping sur chacun, puis comparaison avec le scan précédent : nouveaux appareils, appareils disparus, changements et alertes. Les pings affichés sont nets (pics du Wi‑Fi du Mac retirés). Aucune charge sur le réseau.</p>
+        </div>
+        <div class="controls"><select class="search" id="scanPick" style="width:auto;height:32px" aria-label="Scans précédents"></select><button class="btn primary" id="bScan">Lancer un scan</button></div>
+      </div>
+      <div class="panel scan-sum" id="scanSum"><div class="empty" style="grid-column:1/-1">Aucun scan enregistré. « Lancer un scan » relève les appareils et les ping pendant 5 secondes.</div></div>
+      <div id="scanBody"></div>
+    </section>
+
+    <!-- PING -->
+    <section class="view" id="v-ping">
+      <div class="view-head">
+        <div>
+          <h1>Ping en continu</h1>
+          <p>Ping des appareils cochés, plus la box comme référence. Quand le Wi‑Fi du Mac a lui-même un pic, ces instants sont retirés de la colonne « net » pour ne garder que l'appareil.</p>
+        </div>
+        <div class="controls">
+          <label class="field">Cadence <select id="pIv"><option value="0.25">4 / s</option><option value="0.5">2 / s</option><option value="1">1 / s</option></select></label>
+          <label class="chk"><input type="checkbox" id="pInet" checked> Internet (1.1.1.1)</label>
+          <button class="btn" id="bSavePing" disabled>Enregistrer comme rapport</button>
+          <button class="btn primary" id="bPing">Démarrer le ping</button>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-h"><div class="legend" id="pLegend"></div>
+          <div class="controls"><label class="field">Échelle <select id="pScale"><option value="auto">auto</option><option value="50">0–50 ms</option><option value="200">0–200 ms</option></select></label>
+          <label class="field">Fenêtre <select id="pWin"><option value="60">1 min</option><option value="180">3 min</option><option value="600">10 min</option></select></label></div></div>
+        <div class="panel-b"><canvas class="chart" id="cPing" style="height:280px"></canvas></div>
+      </div>
+      <div class="panel" style="margin-top:14px">
+        <div class="panel-h"><h3>Statistiques depuis le départ</h3><span class="sub" id="pDur"></span></div>
+        <div style="overflow:auto"><table class="t" id="pTable"><thead><tr><th>Cible</th><th>Dernier</th><th>Min</th><th>Moy</th><th>Moy net</th><th>95 %</th><th>Max</th><th>Max net</th><th>Gigue</th><th>Pertes</th><th>Pics &gt; 60</th></tr></thead><tbody><tr><td colspan="11" class="empty">Coche des appareils à gauche puis démarre le ping.</td></tr></tbody></table></div>
+      </div>
+    </section>
+
+    <!-- DEBIT -->
+    <section class="view" id="v-load">
+      <div class="view-head">
+        <div>
+          <h1>Débit et surcharge</h1>
+          <p>Le Mac ouvre plusieurs téléchargements ou envois en parallèle vers des serveurs français, et la box indique en même temps ce qu'elle reçoit sur la fibre, tous appareils confondus.</p>
+        </div>
+      </div>
+      <div class="panel" style="margin-bottom:14px">
+        <div class="panel-b controls" style="gap:18px">
+          <div class="seg" id="lMode" role="group" aria-label="Sens"><button data-m="down" aria-pressed="true">Réception</button><button data-m="up" aria-pressed="false">Envoi</button><button data-m="both" aria-pressed="false">Les deux</button></div>
+          <label class="field">Flux <input type="range" id="lFlows" min="1" max="16" value="8"><span class="mono" id="lFlowsV" style="width:2ch">8</span></label>
+          <label class="field">Durée <select id="lDur"><option>10</option><option selected>15</option><option>30</option><option>60</option></select> s</label>
+          <label class="chk"><input type="checkbox" id="lPing" checked> Pinger les appareils cochés pendant la charge</label>
+          <div style="margin-left:auto;display:flex;gap:8px">
+            <button class="btn" id="bNQ" data-need="nq" title="Test intégré à macOS : débit + réactivité sous charge">Test Apple</button>
+            <button class="btn primary" id="bLoad">Lancer la surcharge</button>
+          </div>
+        </div>
+      </div>
+      <div class="grid g-4">
+        <div class="panel readout hero" style="grid-column:span 2">
+          <div class="lb"><span class="sw" style="background:var(--s1)"></span>La box reçoit (fibre, tout le foyer)</div>
+          <div class="v" id="rBoxD">—</div>
+          <div class="bar"><i id="rBoxDBar" style="width:0"></i></div>
+          <div class="ft" id="rBoxDFt">pic —</div>
+        </div>
+        <div class="panel readout">
+          <div class="lb"><span class="sw" style="background:var(--s3)"></span>Le Mac reçoit</div>
+          <div class="v" id="rMacD">—</div><div class="ft" id="rMacDFt">moy —</div>
+        </div>
+        <div class="panel readout">
+          <div class="lb"><span class="sw" style="background:var(--s2)"></span>Le Mac envoie</div>
+          <div class="v" id="rMacU">—</div><div class="ft" id="rMacUFt">moy —</div>
+        </div>
+      </div>
+      <div class="panel" style="margin-top:14px">
+        <div class="panel-h"><div class="legend"><span><i style="background:var(--s1)"></i>Box reçoit</span><span><i style="background:var(--s3)"></i>Mac reçoit</span><span><i style="background:var(--s2)"></i>Mac envoie</span><span><i style="background:var(--s4)"></i>Box envoie</span></div>
+          <div class="controls"><span class="sub mono" id="lProg"></span><label class="field">Échelle <select id="lScale"><option value="auto">auto</option><option value="8000">jusqu'à 8 Gb/s</option></select></label></div></div>
+        <div class="panel-b"><canvas class="chart" id="cLoad"></canvas></div>
+      </div>
+      <div class="grid g-2" style="margin-top:14px">
+        <div class="panel"><div class="panel-h"><h3>Ping pendant la charge</h3><span class="sub">montée par rapport au repos = file d'attente qui gonfle</span></div>
+          <div style="overflow:auto"><table class="t" id="lpTable"><thead><tr><th>Cible</th><th>Moy</th><th>Moy net</th><th>Max</th><th>Pertes</th><th>Pics &gt; 60</th></tr></thead><tbody><tr><td colspan="6" class="empty">S'affiche pendant une surcharge.</td></tr></tbody></table></div></div>
+        <div class="panel"><div class="panel-h"><h3>Résultat</h3></div><div class="panel-b" id="lRes"><p class="note" id="lNote"></p></div></div>
+      </div>
+    </section>
+
+    <!-- TEST COMPLET -->
+    <section class="view" id="v-full">
+      <div class="view-head">
+        <div>
+          <h1>Test complet</h1>
+          <p>Enchaîne la latence au repos, un téléchargement saturé puis un envoi saturé, en pingant la box, Internet et les appareils cochés pendant tout le test. Environ 50 secondes. Le Wi‑Fi est saturé pendant une trentaine de secondes.</p>
+        </div>
+        <div class="controls"><button class="btn" id="bSaveFull" disabled>Enregistrer comme rapport</button><button class="btn primary" id="bFull">Lancer le test complet</button></div>
+      </div>
+      <div class="steps" id="steps">
+        <div class="step" data-s="idle"><div class="n">01 · 15 s</div><div class="l">Repos</div><div class="s">latence de référence</div></div>
+        <div class="step" data-s="down"><div class="n">02 · 15 s</div><div class="l">Réception saturée</div><div class="s">débit + ping sous charge</div></div>
+        <div class="step" data-s="up"><div class="n">03 · 12 s</div><div class="l">Envoi saturé</div><div class="s">débit + ping sous charge</div></div>
+        <div class="step" data-s="verdict"><div class="n">04</div><div class="l">Verdict</div><div class="s">enregistré dans l'historique</div></div>
+      </div>
+      <div class="grid g-2">
+        <div class="panel"><div class="panel-h"><h3>Ping : repos, puis sous charge</h3><span class="sub">valeurs nettes (bruit du Wi‑Fi du Mac retiré)</span></div>
+          <div style="overflow:auto"><table class="t" id="fTable"><thead><tr><th>Cible</th><th>Repos moy</th><th>Repos max</th><th>Réception moy</th><th>Réception max</th><th>Envoi moy</th><th>Envoi max</th><th>Pertes</th></tr></thead><tbody><tr><td colspan="8" class="empty">Pas encore lancé.</td></tr></tbody></table></div></div>
+        <div class="panel"><div class="panel-h"><h3>Débits</h3></div><div class="panel-b"><dl class="kv" id="fRates"><dt>Box a reçu (pic)</dt><dd>—</dd><dt>Mac a reçu (moy)</dt><dd>—</dd><dt>Mac a envoyé (moy)</dt><dd>—</dd><dt>Box a envoyé (pic)</dt><dd>—</dd></dl></div></div>
+      </div>
+      <div class="panel" style="margin-top:14px"><div class="panel-h"><h3>Verdict</h3></div><div class="panel-b verdict" id="fVerdict"><span class="c-dim" style="font-size:var(--t-sm)">Le verdict apparaît à la fin du test.</span></div></div>
+    </section>
+
+    <!-- COMPARER -->
+    <section class="view" id="v-cmp">
+      <div class="view-head">
+        <div>
+          <h1>Comparer des rapports</h1>
+          <p>Superpose les rapports enregistrés : avant réglages, après réglages, l'estimation CPL, puis tes nouveaux tests. Le premier rapport coché sert de référence pour les écarts.</p>
+        </div>
+      </div>
+      <div class="cmp">
+        <div class="panel cmp-list">
+          <div class="panel-h"><h3>Rapports</h3><span class="sub" id="repCount"></span></div>
+          <div id="repList"></div>
+          <div class="panel-b" style="border-top:1px solid var(--line)"><p class="note" style="font-size:var(--t-xs)">Pour ajouter un rapport : lance un ping (onglet Ping) ou un test complet, puis « Enregistrer comme rapport ».</p></div>
+        </div>
+        <div style="min-width:0;display:flex;flex-direction:column;gap:14px">
+          <div class="panel">
+            <div class="panel-h">
+              <div class="seg" id="cmpMetric" role="group" aria-label="Mesure">
+                <button data-k="avg" aria-pressed="true">Moyenne</button><button data-k="max" aria-pressed="false">Max</button><button data-k="spikesPerMin" aria-pressed="false" title="Pics au-dessus de 60 ms, par minute">Pics</button><button data-k="loss" aria-pressed="false">Pertes</button><button data-k="link" aria-pressed="false">Lien</button>
+              </div>
+              <div class="chips" id="cmpDevs" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+            </div>
+            <div class="panel-b"><div class="sub" id="barTitle" style="font-size:var(--t-xs);color:var(--text-3);margin-bottom:6px"></div><canvas class="chart" id="cBars" style="height:300px"></canvas><div class="legend" id="barLegend" style="margin-top:10px"></div></div>
+          </div>
+          <div class="panel">
+            <div class="panel-h"><h3>Courbes de ping superposées</h3>
+              <div class="controls"><label class="field">Appareil <select id="curDev"></select></label><label class="field">Échelle <select id="curScale"><option value="auto">auto</option><option value="50">0–50 ms</option><option value="200">0–200 ms</option></select></label></div></div>
+            <div class="panel-b"><canvas class="chart" id="cCurves" style="height:260px"></canvas><div class="legend" id="curLegend" style="margin-top:10px"></div></div>
+          </div>
+          <div class="panel"><div class="panel-h"><h3>Détail et écarts</h3><span class="sub">vert = mieux que la référence, rouge = moins bien</span></div><div style="overflow:auto" id="cmpTable"></div></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HISTORIQUE -->
+    <section class="view" id="v-hist">
+      <div class="view-head"><div><h1>Historique</h1><p>Chaque test complet, surcharge et test Apple est enregistré sur ce Mac.</p></div><button class="btn" id="bHist">Actualiser</button></div>
+      <div class="panel"><div style="overflow:auto"><table class="t" id="hTable"><thead><tr><th>Date</th><th>Type</th><th>Box reçu</th><th>Mac ↓</th><th>Mac ↑</th><th>Internet repos</th><th>Détail</th></tr></thead><tbody></tbody></table></div></div>
+    </section>
+
+    <section class="view" id="v-auth">
+      <div class="auth" id="wiz"></div>
+    </section>
+    <section class="view" id="v-set">
+      <div class="auth" style="max-width:720px">
+        <h1>Réglages</h1>
+        <div class="panel" style="margin-top:16px"><div class="panel-h"><h3>Ta box</h3><span class="sub" id="setBoxSub"></span></div><div class="panel-b">
+          <dl class="kv" id="setBox"></dl><div class="flist" id="setFeat"></div>
+          <div class="setrow"><button class="btn" id="setChange">Changer d'opérateur ou de box</button><button class="btn ghost" id="setBack">Retour</button></div>
+        </div></div>
+        <div class="panel" style="margin-top:14px"><div class="panel-h"><h3>Mises à jour</h3><span class="sub" id="updSub"></span></div><div class="panel-b">
+          <p class="note" id="updTxt" style="margin:0 0 10px"></p>
+          <label class="setrow" style="margin:0 0 10px"><input type="checkbox" id="updAuto"> Installer les mises à jour automatiquement (vérifiées toutes les 6 h)</label>
+          <div class="setrow"><button class="btn" id="updCheck">Vérifier maintenant</button><button class="btn primary" id="updApply" style="display:none">Installer et redémarrer</button></div>
+          <p class="note" style="font-size:var(--t-xs);margin:8px 0 0">Chaque version est signée par le mainteneur. Sonde vérifie la signature avant d'installer quoi que ce soit : une version modifiée par quelqu'un d'autre est refusée.</p>
+        </div></div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div class="modal" id="modal" role="dialog" aria-modal="true" aria-labelledby="mT">
+  <div class="dlg">
+    <h2 id="mT">Une console est en train de jouer</h2>
+    <p id="mP">Le test va saturer le Wi‑Fi pendant plusieurs secondes. Le ping des consoles ci-dessous va monter le temps du test.</p>
+    <ul id="mL"></ul>
+    <div class="acts"><button class="btn" id="mNo">Annuler</button><button class="btn danger" id="mYes">Lancer quand même</button></div>
+  </div>
+</div>
+<div class="modal" id="saveDlg" role="dialog" aria-modal="true" aria-labelledby="sT">
+  <div class="dlg">
+    <h2 id="sT">Enregistrer comme rapport</h2>
+    <p id="sP">Les statistiques et les courbes de ping de chaque appareil sont gardées. Tu pourras les superposer aux autres rapports dans « Comparer ».</p>
+    <input class="txt" id="sName" maxlength="60" placeholder="Nom du rapport, par ex. CPL" aria-label="Nom du rapport">
+    <div class="acts"><button class="btn" id="sNo">Annuler</button><button class="btn primary" id="sYes">Enregistrer</button></div>
+  </div>
+</div>
+<div class="modal" id="namesDlg" role="dialog" aria-modal="true" aria-labelledby="nT">
+  <div class="dlg" style="width:min(760px,94vw);max-height:86vh;display:flex;flex-direction:column">
+    <h2 id="nT">Noms automatiques</h2>
+    <p>Noms trouvés à partir de ce que chaque appareil annonce sur le réseau (UPnP, mDNS, DHCP) ou de son fabricant. Modifie‑les si besoin, coche ceux à envoyer à la box : ils seront visibles partout, Freebox OS compris.</p>
+    <div style="overflow:auto;margin-top:12px;border:1px solid var(--line);border-radius:var(--r)"><table class="t" id="nTable"><thead><tr><th style="width:28px"></th><th>Nom actuel</th><th style="text-align:left">Nom proposé</th><th>Trouvé via</th><th>Modèle détecté</th></tr></thead><tbody></tbody></table></div>
+    <label class="chk" style="margin-top:12px"><input type="checkbox" id="nAuto"> Nommer automatiquement les nouveaux appareils dès leur connexion (seulement ceux sans vrai nom, tant que Sonde est ouverte)</label>
+    <div class="acts"><span class="sub" id="nInfo" style="margin-right:auto;font-size:var(--t-xs);color:var(--text-3);align-self:center"></span><button class="btn" id="nNo">Fermer</button><button class="btn primary" id="nYes">Renommer sur la box</button></div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const nf0 = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 });
+const nf1 = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 1, minimumFractionDigits: 1 });
+const nf2 = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2, minimumFractionDigits: 2 });
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const css = v => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const store = { get(k, d) { try { const v = localStorage.getItem('sonde.' + k); return v ? JSON.parse(v) : d; } catch { return d; } }, set(k, v) { try { localStorage.setItem('sonde.' + k, JSON.stringify(v)); } catch { } } };
+
+function rate(v, big) { // Mb/s
+  if (v == null || !isFinite(v)) return '—';
+  if (v >= 1000) return (big ? nf2 : nf2).format(v / 1000) + '<small>Gb/s</small>';
+  return nf0.format(v) + '<small>Mb/s</small>';
+}
+const rateT = v => v == null ? '—' : v >= 1000 ? nf2.format(v / 1000) + ' Gb/s' : nf0.format(v) + ' Mb/s';
+const ms = v => v == null ? '—' : nf1.format(v);
+const pingCls = v => v == null ? 'c-dim' : v < 15 ? 'c-ok' : v < 40 ? 'c-warn' : 'c-bad';
+const sigCls = s => s == null ? '' : s >= -62 ? 'ok' : s >= -70 ? 'warn' : 'bad';
+const bandTxt = b => ({ '2d4g': '2,4 GHz', '5g': '5 GHz', '6g': '6 GHz' }[b] || b || '');
+async function api(p, b) {
+  const r = await fetch(p, b === undefined ? {} : { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(b) });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+function toast(msg, err) { const t = $('#toast'); t.textContent = msg; t.className = 'toast on' + (err ? ' err' : ''); clearTimeout(toast.t); toast.t = setTimeout(() => t.className = 'toast', 5000); }
+
+/* ============ graphique (canvas, sans bibliothèque) ============ */
+class Chart {
+  constructor(cv, o) { this.cv = cv; this.o = Object.assign({ win: 60, unit: '', fmt: v => nf0.format(v), min: 10 }, o); this.series = new Map(); this.dirty = true; new ResizeObserver(() => this.dirty = true).observe(cv); }
+  set(key, label, color) { if (!this.series.has(key)) this.series.set(key, { label, color, pts: [] }); const s = this.series.get(key); s.label = label; s.color = color; this.dirty = true; }
+  push(key, t, v) { const s = this.series.get(key); if (!s) return; s.pts.push([t, v]); const lim = t - 3600e3; while (s.pts.length && s.pts[0][0] < lim) s.pts.shift(); this.dirty = true; }
+  clear() { this.series.clear(); this.dirty = true; }
+  draw() {
+    const cv = this.cv; if (!cv.offsetParent) return;
+    const dpr = devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+    if (cv.width !== W * dpr || cv.height !== H * dpr) { cv.width = W * dpr; cv.height = H * dpr; }
+    const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+    const L = 52, R = 10, T = 10, B = 22, w = W - L - R, h = H - T - B;
+    const tEnd = this.o.tEnd ? this.o.tEnd() : Date.now(), tStart = tEnd - this.o.win * 1000;
+    let max = this.o.min;
+    for (const s of this.series.values()) for (const [t, v] of s.pts) if (t >= tStart && v != null && v > max) max = v;
+    if (this.o.fixed) max = this.o.fixed();
+    if (this.o.ceiling && this.o.showCeiling && this.o.showCeiling()) max = Math.max(max, this.o.ceiling());
+    const nice = n => { const p = 10 ** Math.floor(Math.log10(n)); const f = n / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p; };
+    const step = nice(max / 4); max = Math.ceil(max * 1.04 / step) * step;
+    const X = t => L + (t - tStart) / (tEnd - tStart) * w, Y = v => T + h - Math.min(v, max) / max * h;
+    g.font = '11px "IBM Plex Mono", ui-monospace, monospace'; g.textBaseline = 'middle';
+    g.strokeStyle = css('--line'); g.fillStyle = css('--text-3'); g.lineWidth = 1;
+    for (let v = 0; v <= max + 1e-9; v += step) {
+      const y = Math.round(Y(v)) + .5; g.beginPath(); g.moveTo(L, y); g.lineTo(L + w, y); g.stroke();
+      g.textAlign = 'right'; g.fillText(this.o.fmt(v), L - 8, y);
+    }
+    g.textAlign = 'center'; g.textBaseline = 'top';
+    const tickS = this.o.win <= 60 ? 15 : this.o.win <= 180 ? 30 : 120;
+    for (let s = 0; s <= this.o.win; s += tickS) { const x = X(tEnd - s * 1000); g.fillText(s ? '-' + (s >= 60 ? (s / 60) + ' min' : s + ' s') : 'maint.', Math.min(Math.max(x, L + 14), L + w - 18), T + h + 6); }
+    if (this.o.ceiling && this.o.ceiling() <= max) {
+      const y = Math.round(Y(this.o.ceiling())) + .5; g.setLineDash([4, 4]); g.strokeStyle = css('--text-3'); g.beginPath(); g.moveTo(L, y); g.lineTo(L + w, y); g.stroke(); g.setLineDash([]);
+      g.textAlign = 'left'; g.textBaseline = 'bottom'; g.fillStyle = css('--text-2'); g.fillText(this.o.ceilingLabel || '', L + 6, y - 3);
+    }
+    g.save(); g.beginPath(); g.rect(L, T - 2, w, h + 4); g.clip();
+    for (const s of this.series.values()) {
+      g.strokeStyle = s.color; g.lineWidth = 1.6; g.lineJoin = 'round'; g.beginPath(); let pen = false;
+      for (const [t, v] of s.pts) {
+        if (t < tStart - 2000) continue;
+        if (v == null) { pen = false; g.save(); g.fillStyle = css('--bad'); g.fillRect(X(t) - 1, T, 2, 6); g.restore(); continue; }
+        const x = X(t), y = Y(v); pen ? g.lineTo(x, y) : g.moveTo(x, y); pen = true;
+        if (v > max) { g.save(); g.fillStyle = s.color; g.fillRect(x - 1.5, T, 3, 3); g.restore(); }
+      }
+      g.stroke();
+    }
+    g.restore();
+  }
+}
+const charts = [];
+function loop() { for (const c of charts) c.draw(); requestAnimationFrame(loop); }
+
+/* ============ état ============ */
+const S = {
+  devices: [], sel: new Set(store.get('sel', [])), bw: { down: 8000, up: 8000 }, peakDown: 0, peakUp: 0,
+  ping: { on: false, since: 0, keys: [] }, load: { on: false, mode: 'down', last: null }, full: { on: false }
+};
+const COLORS = ['--s1', '--s3', '--s2', '--s5', '--s6', '--s4', '--s7'];
+
+/* ============ rack d'appareils ============ */
+function renderRack() {
+  const q = $('#q').value.trim().toLowerCase();
+  const list = S.devices.filter(d => !q || d.name.toLowerCase().includes(q) || (d.ip || '').includes(q));
+  const groups = [['cable', 'Câble'], ['box', 'Wi‑Fi de la box'], ['repeteur', 'Wi‑Fi du répéteur']];
+  let html = '';
+  for (const [via, label] of groups) {
+    const g = list.filter(d => d.via === via); if (!g.length) continue;
+    html += `<div class="grp"><span>${label}</span><span>${g.length}</span></div>`;
+    for (const d of g) {
+      const sel = S.sel.has(d.id);
+      const act = d.down + d.up > 50;
+      const meta = [esc(d.ip || 'sans IP'), d.via === 'cable' ? (d.linkTx ? nf0.format(d.linkTx) + ' Mb/s' : 'câble') : bandShort(d.band) + (d.linkTx ? ' · ' + nf0.format(d.linkTx) + ' Mb/s' : '')];
+      if (act) meta.push(`<span class="live">↓${fmtK(d.down)} ↑${fmtK(d.up)}</span>`);
+      const side = d.via === 'cable'
+        ? `<span class="db">${d.port ? esc(d.port.replace('Ethernet ', 'port ').replace('Sfp lan', 'port 10G')) : 'câble'}</span>`
+        : `${bars(d.signal)}<span class="db">${d.signal ?? '—'} dBm</span>`;
+      html += `<div class="dev${sel ? ' sel' : ''}" data-id="${esc(d.id)}" title="${esc(d.name)}${d.vendor ? ' · ' + esc(d.vendor) : ''}">
+        <input type="checkbox" ${sel ? 'checked' : ''} ${d.ip ? '' : 'disabled'} aria-label="Sélectionner ${esc(d.name)}" tabindex="-1">
+        <div style="min-width:0"><div class="nm"><span>${esc(pretty(d))}</span>${d.gaming ? '<em class="tag game">en jeu</em>' : d.isConsole ? '<em class="tag cons">console</em>' : ''}</div><div class="meta">${meta.join(' · ')}</div></div>
+        <div class="side">${side}</div></div>`;
+    }
+  }
+  $('#rack').innerHTML = html || '<div class="empty">Aucun appareil actif.</div>';
+  const n = [...S.sel].filter(id => S.devices.some(d => d.id === id)).length;
+  $('#selCount').textContent = n + (n > 1 ? ' sélectionnés' : ' sélectionné');
+}
+const bandShort = b => ({ '2d4g': '2,4G', '5g': '5G', '6g': '6G' }[b] || '');
+const bars = sig => { if (sig == null) return ''; const n = sig >= -55 ? 4 : sig >= -63 ? 3 : sig >= -71 ? 2 : 1; return `<span class="bars ${sigCls(sig)}" aria-label="signal ${sig} dBm">${[1, 2, 3, 4].map(i => `<i class="${i <= n ? 'on' : ''}"></i>`).join('')}</span>`; };
+const GENNAME = /^([0-9a-f]{8}-[0-9a-f]{4}.*|android(-\d+)?|ubiquiti.*|)$/i;
+const pretty = d => GENNAME.test(d.name || '') ? (d.suggest || 'Appareil sans nom') : d.name;
+const fmtK = k => k >= 1000 ? nf1.format(k / 1000) + ' M' : nf0.format(k) + ' k';
+$('#rack').addEventListener('click', e => {
+  const row = e.target.closest('.dev'); if (!row) return;
+  const d = S.devices.find(x => x.id === row.dataset.id); if (!d || !d.ip) return;
+  S.sel.has(d.id) ? S.sel.delete(d.id) : S.sel.add(d.id); store.set('sel', [...S.sel]); renderRack();
+});
+$('#q').addEventListener('input', renderRack);
+$$('.quick button').forEach(b => b.onclick = () => {
+  const m = b.dataset.q;
+  if (m === 'none') S.sel.clear();
+  else for (const d of S.devices) if (d.ip && (m === 'all' || d.isConsole)) S.sel.add(d.id);
+  store.set('sel', [...S.sel]); renderRack();
+});
+const selected = () => S.devices.filter(d => S.sel.has(d.id) && d.ip);
+
+/* ============ onglets ============ */
+function show(v) { $$('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.v === v)); $$('.view').forEach(x => x.classList.toggle('on', x.id === 'v-' + v)); if (v === 'hist') loadHist(); if (v === 'svc') svcInit(); if (v === 'devs') renderDevTable(); if (v === 'cmp') loadReports(); if (v === 'scan' && !S.scan) loadScans(); store.set('tab', v); }
+$$('nav.tabs button').forEach(b => b.onclick = () => show(b.dataset.v));
+
+/* ============ DIRECT ============ */
+const cWan = new Chart($('#cWan'), { win: 180, fmt: v => v >= 1000 ? nf1.format(v / 1000) + ' G' : nf0.format(v) + ' M', min: 50, ceiling: () => S.bw.down, showCeiling: () => false, ceilingLabel: 'abonnement' });
+cWan.set('d', 'Reçu', css('--s1')); cWan.set('u', 'Envoyé', css('--s2')); charts.push(cWan);
+function onWan(w) {
+  S.lastWan = Date.now();
+  if (w.bwDown) S.bw = { down: w.bwDown, up: w.bwUp };
+  cWan.push('d', w.t, w.down); cWan.push('u', w.t, w.up);
+  S.peakDown = Math.max(S.peakDown, w.down || 0); S.peakUp = Math.max(S.peakUp, w.up || 0);
+  $('#hDown').textContent = rateT(w.down); $('#hUp').textContent = rateT(w.up);
+  $('#lDown').innerHTML = rate(w.down); $('#lUp').innerHTML = rate(w.up);
+  $('#lDownBar').style.width = Math.min(100, (w.down || 0) / S.bw.down * 100) + '%';
+  $('#lUpBar').style.width = Math.min(100, (w.up || 0) / S.bw.up * 100) + '%';
+  $('#lDownFt').textContent = `sur ${rateT(S.bw.down)} possibles · pic de la session ${rateT(S.peakDown)}`;
+  $('#lUpFt').textContent = `sur ${rateT(S.bw.up)} possibles · pic de la session ${rateT(S.peakUp)}`;
+  const f = $('#pFibre'); f.innerHTML = `<span class="dot ${w.state === 'up' ? 'ok' : 'bad'}"></span>${w.bwDown ? 'Fibre' : 'Internet'} ${w.state === 'up' ? 'connecté' + (w.bwDown ? 'e' : '') : esc(w.state || '…')}${w.bwDown ? ' · ' + rateT(S.bw.down) : ''}`;
+  if (S.load.on) { $('#rBoxD').innerHTML = rate(w.down); $('#rBoxDBar').style.width = Math.min(100, (w.down || 0) / S.bw.down * 100) + '%'; }
+}
+async function loadOverview() {
+  let o;
+  try { o = await api('/api/overview'); } catch (e) { return toast('Moteur injoignable : ' + e.message, true); }
+  if (o.needSetup || o.needAuth) { if (!$('#v-auth').classList.contains('on')) openWizard(); return; }
+  if ($('#v-auth').classList.contains('on') || $('#v-set').classList.contains('on')) return;
+  $('nav.tabs').style.display = '';
+  if (o.error) toast(o.error, true);
+  const sy = o.system || {};
+  $('#boxModel').textContent = sy.model || '';
+  $('#kvBox').innerHTML = kv([['Firmware', sy.firmware], ['Allumée depuis', fmtUp(sy.uptimeSec)], ['Température max', sy.tempMax != null ? sy.tempMax + ' °C' : null], ['Ventilateur', sy.fan != null ? sy.fan + ' tr/min' : null], ['Abonnement', o.connection?.bwDown ? `${rateT(o.connection.bwDown)} / ${rateT(o.connection.bwUp)}` : null]]);
+  const wf = o.wifi || {};
+  $('#psv').textContent = wf.powerSaving === false ? 'économie d\'énergie coupée' : wf.powerSaving ? 'économie d\'énergie active' : '';
+  $('#psv').className = 'sub ' + (wf.powerSaving ? 'c-warn' : '');
+  const cnt = b => S.devices.filter(d => d.band === b && d.via === 'box').length;
+  $('#radios').innerHTML = (wf.radios || []).map(r => `<div class="row"><span class="k">${esc(r.name)}</span><span class="d">canal ${r.channel ?? '—'} · ${r.width ?? '—'} MHz</span><span class="e ${r.state === 'active' ? '' : 'c-warn'}">${r.state === 'active' ? cnt(r.band) + ' app.' : esc(r.state)}</span></div>`).join('') || '<span class="c-dim">—</span>';
+  const rp = o.repeater;
+  $('#repName').textContent = rp?.name || '';
+  $('#kvRep').innerHTML = rp && !rp.error ? kv([['État', rp.state === 'connected' ? 'connecté' : rp.state], ['Lien vers la box', rp.signal != null ? `<span class="sig ${sigCls(rp.signal)}">${rp.signal} dBm</span>` : null, true], ['Débit du lien', rp.throughput ? rateT(rp.throughput) : null], ['Placement', ({ strong: 'excellent', good: 'bon', weak: 'faible' }[rp.placement] || rp.placement)], ['Appareils', S.devices.filter(d => d.via === 'repeteur').length]]) : '<span class="c-dim">Aucun répéteur</span>';
+  const m = o.mac || {};
+  $('#macIf').textContent = m.defaultIf ? 'sortie ' + m.defaultIf : '';
+  $('#kvMac').innerHTML = m.ok ? kv([['Bande', bandTxt(m.band)], ['Canal', m.channel], ['Signal', m.signal != null ? `<span class="sig ${sigCls(m.signal)}">${m.signal} dBm</span>` : null, true], ['Bruit', m.noise != null ? m.noise + ' dBm' : null], ['Lien', m.rate ? m.rate + ' Mb/s' : null]]) : '<span class="c-dim">Wi‑Fi non utilisé</span>';
+  S.mac = m;
+  const ports = Array.isArray(o.ports) ? o.ports : [];
+  $('#ports').innerHTML = ports.map(p => {
+    const slow = p.link === 'up' && p.speed < 1000;
+    return `<div class="row" style="grid-template-columns:110px 1fr auto"><span class="k">${esc(p.name.replace('Sfp lan', 'Port 10G'))}</span><span class="d">${p.link === 'up' ? esc(p.hosts.join(', ') || 'appareil branché') : '<span class="c-dim">libre</span>'}</span><span class="e ${slow ? 'c-warn' : ''}">${p.link === 'up' ? (p.speed >= 1000 ? nf1.format(p.speed / 1000) + ' Gb/s' : p.speed + ' Mb/s') + (slow ? ' · limité' : '') : '—'}</span></div>`;
+  }).join('');
+}
+const kv = rows => rows.filter(r => r[1] != null && r[1] !== '').map(([k, v, raw]) => `<dt>${esc(k)}</dt><dd>${raw ? v : esc(v)}</dd>`).join('');
+const fmtUp = s => { if (!s) return null; const d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60); return (d ? d + ' j ' : '') + (h ? h + ' h ' : '') + m + ' min'; };
+const shortUp = s => s ? String(s).replace(/ (\d+) secondes?/, '').replace(/minutes?/, 'min').replace(/heures?/, 'h').replace(/jours?/, 'j') : null;
+
+/* ============ CONSOLES EN DIRECT + JOURNAL ============ */
+const cCons = new Chart($('#cCons'), { win: 120, fmt: v => nf0.format(v) + ' ms', min: 20 });
+charts.push(cCons);
+const W = { names: {}, last: {}, win: {} };
+function consSeries(targets) {
+  targets.forEach(t => { W.names[t.key] = t.name; if (cCons.series.has(t.key)) { cCons.series.get(t.key).label = t.name; return; } const n = [...cCons.series.keys()].filter(k => k !== 'ref' && k !== 'inet').length; cCons.set(t.key, t.name, t.key === 'ref' ? css('--text-3') : t.key === 'inet' ? css('--s7') : css(['--s1', '--s2', '--s3', '--s5', '--s6'][n % 5])); });
+  $('#consLegend').innerHTML = [...cCons.series].map(([k, s]) => `<span><i style="background:${s.color}"></i>${esc(s.label)}</span>`).join('');
+}
+function onWping(p) {
+  if (p.noise) { W.removed = (W.removed || 0) + 1; return; } // pic dû au Wi‑Fi du Mac : on ne l'attribue pas à l'appareil
+  if (!cCons.series.has(p.key)) { consSeries([{ key: p.key, name: W.names[p.key] || (p.key === 'ref' ? 'Box (référence Mac)' : p.key === 'inet' ? 'Internet · 1.1.1.1' : p.key) }]); }
+  cCons.push(p.key, p.t, p.ms);
+  W.last[p.key] = p.ms;
+  (W.win[p.key] = W.win[p.key] || []).push([p.t, p.ms]);
+  const lim = p.t - 10000; while (W.win[p.key].length && W.win[p.key][0][0] < lim) W.win[p.key].shift();
+}
+function renderPills() {
+  const keys = [...cCons.series.keys()].sort((a, b) => (a === 'ref') - (b === 'ref') || (a === 'inet') - (b === 'inet'));
+  $('#consPills').innerHTML = keys.map(k => {
+    const s = cCons.series.get(k), w = W.win[k] || [], ok = w.filter(x => x[1] != null).map(x => x[1]);
+    const mx = ok.length ? Math.max(...ok) : null, lost = w.length - ok.length, v = W.last[k];
+    return `<div class="cpill"><div class="n"><span class="sw" style="background:${s.color};margin:0"></span>${esc(s.label)}</div>
+      <div class="v ${pingCls(v)}">${v == null ? (k in W.last ? '<span class="c-bad">perdu</span>' : '—') : nf1.format(v)}${v != null ? '<small>ms</small>' : ''}</div>
+      <div class="f">10 s : max <span class="${mx > 60 ? 'c-bad' : mx > 30 ? 'c-warn' : ''}">${mx == null ? '—' : nf0.format(mx)}</span>${lost ? ` · <span class="c-bad">${lost} perdu${lost > 1 ? 's' : ''}</span>` : ''}</div></div>`;
+  }).join('');
+}
+setInterval(() => { renderPills(); if (W.removed) $('#consSub').textContent = `ping 4 fois par seconde · ${nf0.format(W.removed)} mesure${W.removed > 1 ? 's' : ''} retirée${W.removed > 1 ? 's' : ''} (pic du Wi‑Fi du Mac, pas de l'appareil)`; }, 500);
+const evTime = t => { const d = new Date(t), today = new Date().toDateString() === d.toDateString(); return (today ? '' : d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) + '<br>') + d.toLocaleTimeString('fr-FR'); };
+function evRow(e) {
+  if (e.kind === 'newdev') return `<div class="ev"><div class="tm">${evTime(e.start)}</div>
+    <div><div class="w">Nouvel appareil : ${esc(e.device)}</div><div class="c">${e.renamed ? `Nommé automatiquement (avant : « ${esc(e.oldName || 'sans nom')} »). ` : ''}${esc(e.model || '')}${e.model ? ' · ' : ''}${e.via === 'cable' ? 'câble' : (e.via === 'repeteur' ? 'répéteur' : 'box') + ' ' + bandTxt(e.band)} · ${esc(e.ip || '')}</div></div>
+    <div class="pk"><span class="chip acc">nouveau</span></div></div>`;
+  const dur = Math.max(1, Math.round((e.end - e.start) / 1000));
+  return `<div class="ev${e.macNoise ? ' noise' : ''}"><div class="tm">${evTime(e.start)}</div>
+    <div><div class="w">${esc(e.device)}${e.lost ? ` · <span class="c-bad">${e.lost} ping${e.lost > 1 ? 's' : ''} perdu${e.lost > 1 ? 's' : ''}</span>` : ''}</div><div class="c">${esc(e.cause || '')}</div></div>
+    <div class="pk ${e.peak > 100 ? 'c-bad' : 'c-warn'}">${e.peak != null ? nf0.format(e.peak) + ' ms' : '—'}<small>${dur} s</small></div></div>`;
+}
+let EV = [];
+function renderEvents() { const shown = EV.filter(e => !e.macNoise); $('#evList').innerHTML = shown.length ? shown.slice(0, 100).map(evRow).join('') : '<div class="empty">Aucun pic enregistré pour l\'instant.</div>'; const real = EV.filter(e => !e.macNoise && e.kind !== 'newdev').length; $('#evCount').textContent = `${real} pic${real > 1 ? 's' : ''} réel${real > 1 ? 's' : ''}${EV.length - real ? ' · ' + (EV.length - real) + ' faussé' + (EV.length - real > 1 ? 's' : '') + ' par le Mac' : ''}`; }
+async function loadWatch() {
+  try {
+    const w = await api('/api/watch');
+    consSeries(w.targets); EV = w.events; renderEvents();
+  } catch { }
+}
+
+/* ============ PING ============ */
+const cPing = new Chart($('#cPing'), { win: 60, fmt: v => nf0.format(v) + ' ms', min: 20, fixed: null });
+charts.push(cPing);
+$('#pScale').onchange = e => { const v = e.target.value; cPing.o.fixed = v === 'auto' ? null : () => +v; };
+$('#pWin').onchange = e => { cPing.o.win = +e.target.value; };
+function pingTargets(withInet) {
+  const t = [{ key: 'ref', ip: '192.168.1.254', name: 'Box (référence Mac)' }];
+  if (withInet) t.push({ key: 'inet', ip: '1.1.1.1', name: 'Internet · 1.1.1.1' });
+  for (const d of selected()) t.push({ key: 'd:' + d.id, ip: d.ip, name: d.name });
+  return t;
+}
+function setupPingSeries(tg) {
+  cPing.clear();
+  tg.forEach((t, i) => cPing.set(t.key, t.name, t.key === 'ref' ? css('--text-3') : css(COLORS[i % COLORS.length])));
+  $('#pLegend').innerHTML = tg.map(t => `<span><i style="background:${cPing.series.get(t.key).color}"></i>${esc(t.name)}</span>`).join('');
+}
+async function startPing() {
+  const tg = pingTargets($('#pInet').checked);
+  setupPingSeries(tg);
+  S.ping = { on: true, since: Date.now(), keys: tg.map(t => t.key), names: Object.fromEntries(tg.map(t => [t.key, t.name])), last: {} };
+  await api('/api/ping/start', { targets: tg, interval: +$('#pIv').value });
+  $('#bPing').textContent = 'Arrêter le ping'; $('#bPing').className = 'btn danger'; $('#rPing').classList.add('on'); $('#bSavePing').disabled = false; $('#bSaveFull').disabled = true;
+}
+async function stopPing() {
+  await api('/api/ping/stop', {}).catch(() => { });
+  S.ping.on = false; $('#bPing').textContent = 'Démarrer le ping'; $('#bPing').className = 'btn primary'; $('#rPing').classList.remove('on');
+}
+$('#bPing').onclick = () => S.ping.on ? stopPing() : (S.full.on ? toast('Un test complet est en cours.') : startPing().catch(e => toast(e.message, true)));
+function onPing(p) {
+  if (cPing.series.has(p.key)) cPing.push(p.key, p.t, p.ms);
+  if (S.ping.last) S.ping.last[p.key] = p.ms;
+}
+function statRow(name, st, last, color) {
+  const r = st.raw || {}, c = st.clean || r;
+  return `<tr><td><span class="sw" style="background:${color}"></span>${esc(name)}</td><td class="${pingCls(last)}">${last === undefined ? '—' : last === null ? '<span class="c-bad">perdu</span>' : ms(last)}</td>
+    <td>${ms(r.min)}</td><td class="${pingCls(r.avg)}">${ms(r.avg)}</td><td class="${pingCls(c.avg)}">${st.clean ? ms(c.avg) : '<span class="c-dim">—</span>'}</td><td>${ms(r.p95)}</td>
+    <td class="${r.max > 100 ? 'c-bad' : r.max > 40 ? 'c-warn' : ''}">${ms(r.max)}</td><td class="${c.max > 100 ? 'c-bad' : c.max > 40 ? 'c-warn' : ''}">${st.clean ? ms(c.max) : '<span class="c-dim">—</span>'}</td>
+    <td>${ms(r.jitter)}</td><td class="${r.loss > 1 ? 'c-bad' : r.loss > 0 ? 'c-warn' : ''}">${r.n ? nf1.format(r.loss) + ' %' : '—'}</td><td class="${c.spikes > 0 ? 'c-warn' : ''}">${c.spikes ?? '—'}</td></tr>`;
+}
+async function refreshPingStats() {
+  if (!S.ping.on) return;
+  try {
+    const st = await api('/api/ping/stats', { since: S.ping.since + 2000 });
+    $('#pTable tbody').innerHTML = S.ping.keys.filter(k => st[k]).map(k => statRow(st[k].name, st[k], S.ping.last[k], cPing.series.get(k)?.color || '#888')).join('');
+    const s = Math.round((Date.now() - S.ping.since) / 1000); $('#pDur').textContent = `${Math.floor(s / 60)} min ${String(s % 60).padStart(2, '0')} s · ${st.ref?.raw?.n || 0} mesures par cible`;
+  } catch { }
+}
+setInterval(refreshPingStats, 500);
+
+/* ============ garde « console en jeu » ============ */
+function guard() {
+  const g = S.devices.filter(d => d.gaming);
+  if (!g.length) return Promise.resolve(true);
+  return new Promise(res => {
+    $('#mL').innerHTML = g.map(d => `<li><span>${esc(d.name)}</span><span class="mono c-warn">↓ ${fmtK(d.down)}b/s · ↑ ${fmtK(d.up)}b/s</span></li>`).join('');
+    $('#modal').classList.add('on'); $('#mNo').focus();
+    const done = v => { $('#modal').classList.remove('on'); $('#mYes').onclick = $('#mNo').onclick = null; res(v); };
+    $('#mYes').onclick = () => done(true); $('#mNo').onclick = () => done(false);
+  });
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && $('#modal').classList.contains('on')) $('#mNo').click(); });
+
+/* ============ DEBIT ============ */
+const cLoad = new Chart($('#cLoad'), { win: 30, fmt: v => v >= 1000 ? nf1.format(v / 1000) + ' G' : nf0.format(v) + ' M', min: 100, ceiling: () => S.bw.down, showCeiling: () => $('#lScale').value === '8000', ceilingLabel: 'fibre 8 Gb/s', tEnd: () => S.load.tEnd || Date.now() });
+cLoad.set('boxD', 'Box reçoit', css('--s1')); cLoad.set('macD', 'Mac reçoit', css('--s3')); cLoad.set('macU', 'Mac envoie', css('--s2')); cLoad.set('boxU', 'Box envoie', css('--s4'));
+charts.push(cLoad);
+$$('#lMode button').forEach(b => b.onclick = () => { $$('#lMode button').forEach(x => x.setAttribute('aria-pressed', x === b)); S.load.mode = b.dataset.m; });
+$('#lFlows').oninput = e => $('#lFlowsV').textContent = e.target.value;
+function loadNote() {
+  const m = S.mac || {};
+  const lim = m.rate ? `Ce Mac est en ${bandTxt(m.band)} avec un lien à <b>${m.rate} Mb/s</b> : en Wi‑Fi, il plafonne vers 60 à 75 % de ce lien, soit <b>${rateT(Math.round(m.rate * 0.6))} à ${rateT(Math.round(m.rate * 0.75))}</b>.` : '';
+  $('#lNote').innerHTML = `${lim} Pour voir si la fibre délivre bien ses ${rateT(S.bw.down)}, regarde « La box reçoit » : c'est le total de la maison mesuré par la box elle-même. Un seul appareil en Wi‑Fi ne peut pas remplir 8 Gb/s ; il faut plusieurs appareils en charge en même temps, ou un appareil en câble 10 Gb/s.`;
+}
+async function startLoad() {
+  if (!(await guard())) return;
+  const body = { mode: S.load.mode, flows: +$('#lFlows').value, duration: +$('#lDur').value };
+  for (const k of ['boxD', 'macD', 'macU', 'boxU']) cLoad.series.get(k).pts = [];
+  S.load = { ...S.load, on: true, started: Date.now(), tEnd: null, pts: [] };
+  cLoad.o.win = body.duration + 4;
+  if ($('#lPing').checked && !S.ping.on) {
+    const tg = pingTargets(true); S.load.pingKeys = tg; S.load.pingSince = Date.now() + 2000;
+    await api('/api/ping/start', { targets: tg, interval: 0.25 });
+  } else S.load.pingKeys = null;
+  await api('/api/load/start', body);
+  $('#bLoad').textContent = 'Arrêter'; $('#bLoad').className = 'btn danger'; $('#rLoad').classList.add('on');
+  $('#lRes').innerHTML = '<p class="note"><span class="spin"></span>&nbsp; Mesure en cours…</p>';
+}
+function onLoad(p) {
+  if (!S.load.on) return;
+  cLoad.push('boxD', p.t, p.boxDown); cLoad.push('macD', p.t, p.macDown); cLoad.push('macU', p.t, p.macUp); cLoad.push('boxU', p.t, p.boxUp);
+  S.load.pts.push(p);
+  const w = S.load.pts.filter(x => x.elapsed > 2.5);
+  const avg = k => w.length ? w.reduce((a, b) => a + (b[k] || 0), 0) / w.length : null;
+  $('#rMacD').innerHTML = rate(p.macDown); $('#rMacDFt').textContent = 'moy ' + rateT(avg('macDown') && Math.round(avg('macDown')));
+  $('#rMacU').innerHTML = rate(p.macUp); $('#rMacUFt').textContent = 'moy ' + rateT(avg('macUp') && Math.round(avg('macUp')));
+  const pk = Math.max(0, ...w.map(x => x.boxDown || 0));
+  $('#rBoxD').innerHTML = rate(p.boxDown); $('#rBoxDBar').style.width = Math.min(100, (p.boxDown || 0) / S.bw.down * 100) + '%';
+  $('#rBoxDFt').textContent = `pic ${rateT(pk)} · ${Math.round(pk / S.bw.down * 100)} % de la fibre`;
+  $('#lProg').textContent = `${Math.min(p.elapsed, p.duration).toFixed(0)} / ${p.duration} s`;
+  if (S.load.pingKeys) refreshLoadPing();
+}
+async function refreshLoadPing(final) {
+  if (refreshLoadPing.busy && !final) return; refreshLoadPing.busy = true;
+  try {
+    const st = await api('/api/ping/stats', { since: S.load.pingSince });
+    const rows = S.load.pingKeys.filter(t => st[t.key]).map((t, i) => { const r = st[t.key].raw, c = st[t.key].clean || r;
+      return `<tr><td>${esc(t.name)}</td><td class="${pingCls(r.avg)}">${ms(r.avg)}</td><td class="${pingCls(c.avg)}">${st[t.key].clean ? ms(c.avg) : '—'}</td><td class="${r.max > 100 ? 'c-bad' : r.max > 40 ? 'c-warn' : ''}">${ms(r.max)}</td><td>${r.n ? nf1.format(r.loss) + ' %' : '—'}</td><td>${c.spikes ?? '—'}</td></tr>`; });
+    $('#lpTable tbody').innerHTML = rows.join('');
+    S.load.pingStats = st;
+  } catch { } finally { refreshLoadPing.busy = false; }
+}
+async function onLoadEnd(sum) {
+  if (!S.load.on) return;
+  S.load.on = false; S.load.tEnd = Date.now(); S.load.last = sum;
+  $('#bLoad').textContent = 'Lancer la surcharge'; $('#bLoad').className = 'btn primary'; $('#rLoad').classList.remove('on');
+  if (S.load.pingKeys) { await refreshLoadPing(true); await api('/api/ping/stop', {}).catch(() => { }); }
+  const pct = sum.boxDownMax ? Math.round(sum.boxDownMax / S.bw.down * 100) : null;
+  $('#lRes').innerHTML = `<dl class="kv">
+    <dt>La box a reçu au maximum</dt><dd>${rateT(sum.boxDownMax)}${pct != null ? ' · ' + pct + ' %' : ''}</dd>
+    <dt>Le Mac a reçu en moyenne</dt><dd>${rateT(sum.macDownAvg)} (max ${rateT(sum.macDownMax)})</dd>
+    <dt>Le Mac a envoyé en moyenne</dt><dd>${rateT(sum.macUpAvg)} (max ${rateT(sum.macUpMax)})</dd>
+    <dt>La box a envoyé au maximum</dt><dd>${rateT(sum.boxUpMax)}</dd>
+    <dt>Volume échangé</dt><dd>${nf0.format(sum.totalMB)} Mo · ${sum.flows} flux · ${sum.errors} erreur(s)</dd></dl>
+    <p class="note" style="margin-top:12px" id="lNote"></p>`;
+  loadNote();
+  const ping = S.load.pingStats ? Object.fromEntries(Object.entries(S.load.pingStats).map(([k, v]) => [k, { name: v.name, raw: v.raw, clean: v.clean }])) : null;
+  api('/api/load/save', { ...sum, mac: S.mac, ping }).catch(() => { });
+}
+$('#bLoad').onclick = async () => {
+  if (S.load.on) { const r = await api('/api/load/stop', {}); if (r.summary) onLoadEnd(r.summary); return; }
+  if (S.full.on) return toast('Un test complet est en cours.');
+  startLoad().catch(e => { S.load.on = false; toast(e.message, true); });
+};
+$('#bNQ').onclick = async () => {
+  if (S.load.on || S.full.on) return toast('Attends la fin du test en cours.');
+  if (!(await guard())) return;
+  const b = $('#bNQ'); b.disabled = true; b.innerHTML = '<span class="spin"></span> Test Apple…';
+  try {
+    const r = await api('/api/nq', {});
+    if (!r.ok) throw new Error(r.error);
+    $('#lRes').innerHTML = `<dl class="kv"><dt>Réception (Apple)</dt><dd>${rateT(r.down)}</dd><dt>Envoi (Apple)</dt><dd>${rateT(r.up)}</dd><dt>Latence au repos</dt><dd>${ms(r.idle)} ms</dd><dt>Réactivité en réception</dt><dd>${r.rpmDown ?? '—'} RPM</dd><dt>Réactivité en envoi</dt><dd>${r.rpmUp ?? '—'} RPM</dd><dt>Interface</dt><dd>${esc(r.iface || '—')}</dd></dl><p class="note" style="margin-top:12px">RPM = allers-retours par minute quand la ligne est chargée. Au-dessus de 1000 c'est bon, en dessous de 300 la latence gonfle fort sous charge.</p>`;
+  } catch (e) { toast('Test Apple : ' + e.message, true); }
+  b.disabled = false; b.textContent = 'Test Apple';
+};
+
+/* ============ TEST COMPLET ============ */
+$('#bFull').onclick = async () => {
+  if (S.full.on) { await api('/api/full/stop', {}); return; }
+  if (S.load.on) return toast('Une surcharge est en cours.');
+  if (!(await guard())) return;
+  if (S.ping.on) await stopPing();
+  const targets = selected().map(d => ({ id: d.id, ip: d.ip, name: d.name }));
+  S.full = { on: true, names: Object.fromEntries([['ref', 'Box (référence Mac)'], ['inet', 'Internet · 1.1.1.1'], ...targets.map(t => ['d:' + t.id, t.name])]) };
+  $$('.step').forEach(s => s.className = 'step');
+  $('#fVerdict').innerHTML = '<span class="c-dim" style="font-size:var(--t-sm)"><span class="spin"></span>&nbsp; Test en cours…</span>';
+  $('#fTable tbody').innerHTML = '<tr><td colspan="8" class="empty">Mesure en cours…</td></tr>';
+  await api('/api/full/start', { targets });
+  $('#bFull').textContent = 'Arrêter le test'; $('#bFull').className = 'btn danger'; $('#rFull').classList.add('on');
+};
+function onFull(ev) {
+  const el = $(`.step[data-s="${ev.id}"]`); if (el) el.className = 'step ' + ev.state;
+  if (ev.id === 'down' && ev.state === 'done') renderFullRates({ down: ev.data.load });
+}
+function renderFullRates(r) {
+  S.full.rates = Object.assign(S.full.rates || {}, r);
+  const d = S.full.rates.down || {}, u = S.full.rates.up || {};
+  $('#fRates').innerHTML = kv([['Box a reçu (pic)', rateT(d.boxDownMax)], ['Mac a reçu (moy)', rateT(d.macDownAvg)], ['Mac a envoyé (moy)', rateT(u.macUpAvg)], ['Box a envoyé (pic)', rateT(u.boxUpMax)]]);
+}
+function onFullEnd(r) {
+  S.full.on = false; $('#bFull').textContent = 'Lancer le test complet'; $('#bFull').className = 'btn primary'; $('#rFull').classList.remove('on');
+  if (!r.error) { $('#bSaveFull').disabled = false; $('#bSavePing').disabled = true; }
+  if (r.error) { $('#fVerdict').innerHTML = `<div class="vd bad"><i></i><span>${esc(r.error)}</span></div>`; return; }
+  renderFullRates({ down: r.down, up: r.up });
+  const keys = Object.keys(r.idle || {});
+  const c = (o, k) => (o?.[k]?.clean || o?.[k]?.raw) || {};
+  $('#fTable tbody').innerHTML = keys.map(k => {
+    const a = c(r.idle, k), b = c(r.downPing, k), u = c(r.upPing, k);
+    const loss = Math.max(a.loss || 0, b.loss || 0, u.loss || 0);
+    return `<tr><td>${esc(r.idle[k].name)}</td><td class="${pingCls(a.avg)}">${ms(a.avg)}</td><td>${ms(a.max)}</td><td class="${pingCls(b.avg)}">${ms(b.avg)}</td><td class="${b.max > 100 ? 'c-bad' : b.max > 40 ? 'c-warn' : ''}">${ms(b.max)}</td><td class="${pingCls(u.avg)}">${ms(u.avg)}</td><td class="${u.max > 100 ? 'c-bad' : u.max > 40 ? 'c-warn' : ''}">${ms(u.max)}</td><td class="${loss > 1 ? 'c-bad' : loss > 0 ? 'c-warn' : ''}">${a.n ? nf1.format(loss) + ' %' : '—'}</td></tr>`;
+  }).join('');
+  $('#fVerdict').innerHTML = (r.verdict || []).map(v => `<div class="vd ${v.level}"><i></i><span>${esc(v.text)}</span></div>`).join('');
+}
+
+/* ============ TABLEAU DES APPAREILS ============ */
+const DT = { sort: store.get('dSort', 'down:desc'), via: 'all', stats: {} };
+const fmtVol = b => b >= 1e9 ? nf1.format(b / 1e9) + ' Go' : b >= 1e6 ? nf0.format(b / 1e6) + ' Mo' : b ? nf0.format(b / 1e3) + ' ko' : '—';
+const COLS = [
+  ['name', 'Appareil', 'asc'], ['via', 'Connexion', 'asc'], ['signal', 'Signal', 'desc'], ['link', 'Lien', 'desc'],
+  ['down', 'Reçoit', 'desc'], ['up', 'Envoie', 'desc'], ['vol', 'Volume reçu', 'desc'],
+  ['pavg', 'Ping moy', 'asc'], ['pmax', 'Ping max', 'asc'], ['loss', 'Pertes', 'asc'], ['ip', 'IP', 'asc'], ['act', '', 'asc']
+];
+function devVal(d, k) {
+  const st = DT.stats[d.id] || {};
+  switch (k) {
+    case 'name': return pretty(d).toLowerCase();
+    case 'via': return d.via + (d.band || '');
+    case 'signal': return d.via === 'cable' ? 0 : (d.asleep && !d.sigFromAwake ? null : d.signal); // câble = meilleur
+    case 'link': return d.linkTx;
+    case 'down': return d.down; case 'up': return d.up; case 'vol': return d.totDown;
+    case 'pavg': return st.loss >= 80 ? null : st.avg; case 'pmax': return st.loss >= 80 ? null : st.max; case 'loss': return st.loss;
+    case 'ip': return (d.ip || '').split('.').map(x => x.padStart(3, '0')).join('.');
+  }
+}
+async function refreshDevStats() { if (!$('#v-devs').classList.contains('on')) return; try { DT.stats = await api('/api/devstats'); } catch { } if (BK.devs === null) { BK.devs = []; api('/api/blocked-devices').then(x => BK.devs = x).catch(() => { }); } renderDevTable(); }
+setInterval(refreshDevStats, 1000);
+function renderDevTable() {
+  if (!$('#v-devs').classList.contains('on')) return;
+  const [sk, sd] = DT.sort.split(':');
+  $('#dTable thead').innerHTML = '<tr>' + COLS.map(([k, l]) => `<th data-k="${k}" class="${k === sk ? 'on' : ''}" data-dir="${sd === 'asc' ? '↑' : '↓'}" style="${k === 'name' || k === 'via' ? 'text-align:left' : ''}">${l}</th>`).join('') + '</tr>';
+  $$('#dQuick .chipbtn').forEach(b => b.setAttribute('aria-pressed', b.dataset.s === DT.sort));
+  const q = $('#dq').value.trim().toLowerCase();
+  let list = S.devices.filter(d => (DT.via === 'all' || (DT.via === 'cable' ? d.via === 'cable' : d.via !== 'cable')) && (!q || d.name.toLowerCase().includes(q) || pretty(d).toLowerCase().includes(q) || (d.ip || '').includes(q)));
+  list.sort((a, b) => {
+    const va = devVal(a, sk), vb = devVal(b, sk);
+    if (va == null && vb == null) return 0; if (va == null) return 1; if (vb == null) return -1; // vides toujours en bas
+    const c = typeof va === 'string' ? va.localeCompare(vb) : va - vb;
+    return sd === 'asc' ? c : -c;
+  });
+  const maxRate = Math.max(1, ...list.map(d => Math.max(d.down, d.up)));
+  $('#dTable tbody').innerHTML = list.map(d => {
+    const st = DT.stats[d.id] || {};
+    const [tl] = typeOf(d);
+    const dead = st.loss >= 80 || (d.asleep && st.loss >= 30); // ne répond presque jamais : appareil en veille, ses rares réponses ne sont pas représentatives
+    return `<tr class="${S.sel.has(d.id) ? 'sel' : ''}">
+      <td class="nmc"><div class="a"><span class="nn" title="${esc(d.name)}${d.vendor ? ' · ' + esc(d.vendor) : ''}">${esc(pretty(d))}</span>${d.gaming ? '<span class="chip warn">en jeu</span>' : ''}</div><div class="b">${esc(d.model || tl)}</div></td>
+      <td style="text-align:left;font-family:var(--sans);color:var(--text-2)">${d.via === 'cable' ? 'Câble' + (d.port ? ' · ' + esc(d.port.replace('Ethernet ', 'port ').replace('Sfp lan', '10G')) : '') : (d.via === 'repeteur' ? 'Répéteur' : 'Box') + ' · ' + bandTxt(d.band)}</td>
+      <td>${d.via === 'cable' ? '<span class="c-dim">câble</span>' : d.asleep && !d.sigFromAwake ? `<span class="c-dim" title="En veille : la box mesure ${d.sigNow} dBm, signal éveillé encore inconnu">veille</span>` : `<div class="tb" title="${d.asleep ? `En veille (box : ${d.sigNow} dBm). Signal mesuré éveillé il y a ${d.sigAge} min` : 'Signal actuel'}">${bars(d.signal)}<span class="sig ${d.asleep ? 'c-dim' : sigCls(d.signal)}">${d.signal ?? '—'}</span></div>`}</td>
+      <td>${d.linkTx ? nf0.format(d.linkTx) : '—'}</td>
+      <td><div class="tb"><i style="width:${Math.round(d.down / maxRate * 60)}px"></i>${fmtK(d.down)}b/s</div></td>
+      <td><div class="tb up"><i style="width:${Math.round(d.up / maxRate * 60)}px"></i>${fmtK(d.up)}b/s</div></td>
+      <td>${fmtVol(d.totDown)}</td>
+      <td class="${dead ? 'c-dim' : pingCls(st.avg)}">${dead ? (st.loss === 100 ? 'muet' : 'en veille') : ms(st.avg)}</td>
+      <td class="${dead ? 'c-dim' : st.max > 100 ? 'c-bad' : st.max > 40 ? 'c-warn' : ''}">${dead ? '—' : ms(st.max)}</td>
+      <td class="${st.loss > 0 && !dead ? 'c-warn' : 'c-dim'}">${st.n ? (st.loss === 100 ? '—' : nf0.format(st.loss) + ' %') : '…'}</td>
+      <td class="c-dim">${esc(d.ip || '—')}</td>
+      <td style="white-space:nowrap">${d.ip && !/sonde|r[ée]p[ée]teur/i.test(d.name) ? (PR.cur && PR.cur.ip === d.ip ? '<span class="chip ok">prioritaire</span> ' : `<button class="btn sm ghost" data-pr="${esc(d.id)}" title="Couper vidéo, téléchargements et mises à jour des autres appareils">Priorité</button> `) : ''}${(d.via === 'cable' && FEAT?.cableBlock === false) || d.isSelf || /r[ée]p[ée]teur/i.test(d.name) ? '' : (BK.devs || []).some(x => x.mac.toUpperCase() === (d.mac || '').toUpperCase()) ? `<button class="btn sm" data-need="block" data-bd="${esc(d.id)}" data-on="0">Débloquer</button>` : `<button class="btn sm ghost" data-need="block" data-bd="${esc(d.id)}" data-on="1">Bloquer</button>`}</td></tr>`;
+  }).join('') || '<tr><td colspan="12" class="empty">Aucun appareil.</td></tr>';
+  const tot = S.devices.reduce((a, d) => [a[0] + d.down, a[1] + d.up], [0, 0]);
+  $('#dFoot').textContent = `${list.length} appareil(s) · trafic total des appareils : ↓ ${fmtK(tot[0])}b/s ↑ ${fmtK(tot[1])}b/s · « muet » = ne répond pas au ping (pare-feu) · « veille » = l'appareil dort (ni trafic ni activité depuis 30 s) : la box mesure alors un signal trop faible, on affiche en gris le dernier signal mesuré éveillé · signal et trafic donnés par la box, actualisés chaque seconde.`;
+}
+$('#dTable').addEventListener('click', e => {
+  const pb = e.target.closest('[data-pr]'); if (pb) { const d = S.devices.find(x => x.id === pb.dataset.pr); if (d) startPrio(d); return; }
+  const bb = e.target.closest('[data-bd]'); if (bb) { const d = S.devices.find(x => x.id === bb.dataset.bd); if (d) blockDevice(d, bb.dataset.on === '1'); return; }
+  const th = e.target.closest('th'); if (!th) return;
+  const k = th.dataset.k, [sk, sd] = DT.sort.split(':');
+  const def = COLS.find(c => c[0] === k)[2];
+  DT.sort = k + ':' + (k === sk ? (sd === 'asc' ? 'desc' : 'asc') : def); store.set('dSort', DT.sort); renderDevTable();
+});
+$('#dQuick').addEventListener('click', e => { const b = e.target.closest('.chipbtn'); if (!b) return; DT.sort = b.dataset.s; store.set('dSort', DT.sort); renderDevTable(); });
+$$('#dVia button').forEach(b => b.onclick = () => { $$('#dVia button').forEach(x => x.setAttribute('aria-pressed', x === b)); DT.via = b.dataset.f; renderDevTable(); });
+$('#dq').addEventListener('input', renderDevTable);
+
+/* ============ NOMS AUTOMATIQUES ============ */
+function openNames() {
+  const list = S.devices.filter(d => d.suggest && d.id);
+  $('#nTable tbody').innerHTML = list.map(d => {
+    const generic = GENNAME.test(d.name || '');
+    const same = d.suggest === d.name;
+    return `<tr data-id="${esc(d.id)}"><td><input type="checkbox" ${generic && !same ? 'checked' : ''} ${same ? 'disabled' : ''} aria-label="Renommer ${esc(d.name)}"></td>
+      <td class="${generic ? 'c-dim' : ''}" style="font-family:var(--mono);font-weight:400;max-width:220px;overflow:hidden;text-overflow:ellipsis">${esc(d.name || '(vide)')}${d.manual ? ' <span class="chip" title="Nom déjà choisi à la main">manuel</span>' : ''}</td>
+      <td style="text-align:left"><input class="search" style="height:28px;width:220px;font-family:var(--mono)" value="${esc(d.suggest)}" maxlength="60" aria-label="Nouveau nom"></td>
+      <td style="font-family:var(--sans);color:var(--text-2)">${esc(d.source || '—')}</td>
+      <td style="font-family:var(--sans);color:var(--text-2);text-align:right">${esc(d.model || '—')}${d.randomMac ? ' <span class="chip" title="Adresse Wi‑Fi privée : l&#39;appareil change parfois d&#39;adresse, il peut réapparaître sous un autre nom">MAC privée</span>' : ''}</td></tr>`;
+  }).join('') || '<tr><td colspan="5" class="empty">Aucune proposition.</td></tr>';
+  $('#nInfo').textContent = 'Cochés par défaut : les appareils sans vrai nom. Les noms déjà choisis à la main restent décochés.';
+  $('#namesDlg').classList.add('on');
+}
+$('#bNames').onclick = () => { openNames(); api('/api/settings').then(st => $('#nAuto').checked = !!st.autoName).catch(() => { }); };
+$('#nAuto').onchange = e => api('/api/settings', { autoName: e.target.checked }).then(() => toast(e.target.checked ? 'Nommage automatique activé.' : 'Nommage automatique désactivé.')).catch(err => toast(err.message, true));
+$('#nNo').onclick = () => $('#namesDlg').classList.remove('on');
+$('#nYes').onclick = async () => {
+  const items = $$('#nTable tbody tr[data-id]').filter(tr => tr.querySelector('input[type=checkbox]').checked).map(tr => ({ id: tr.dataset.id, name: tr.querySelector('input.search').value.trim() })).filter(x => x.name);
+  if (!items.length) return toast('Coche au moins un appareil.');
+  $('#nYes').disabled = true;
+  try { const r = await api('/api/rename', { items }); toast(`${r.done.length} appareil(s) renommé(s) sur la box.`); $('#namesDlg').classList.remove('on'); }
+  catch (e) { toast('Renommage : ' + e.message, true); }
+  $('#nYes').disabled = false;
+};
+
+/* ============ SERVICES (agent de la VM) ============ */
+const SV = { range: store.get('svcRange', '24h'), open: new Set(), timer: null };
+const fmtB = b => b >= 1e12 ? nf2.format(b / 1e12) + ' To' : b >= 1e9 ? nf1.format(b / 1e9) + ' Go' : b >= 1e6 ? nf0.format(b / 1e6) + ' Mo' : b >= 1e3 ? nf0.format(b / 1e3) + ' ko' : b ? b + ' o' : '0';
+const lum = hex => { const n = parseInt(hex.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255)) / 255; };
+function logo(s) {
+  // Vrai logo en couleur (favicon du site du service), sinon le pictogramme, sinon l'initiale
+  const mono = esc((s.name || '?').replace(/[^A-Za-z0-9]/g, '').slice(0, 1).toUpperCase());
+  let bg = s.color || '#3a3f47'; if (lum(bg) < 0.08) bg = '#24272c';
+  if (s.site) return `<span class="logo" style="background:#fff"><img src="/api/logo?d=${encodeURIComponent(s.site)}" alt="" style="width:28px;height:28px;border-radius:6px" onerror="this.parentNode.style.background='${bg}';this.replaceWith(document.createTextNode('${mono}'))"></span>`;
+  const light = lum(bg) > 0.6;
+  const img = s.icon ? `<img src="https://cdn.jsdelivr.net/npm/simple-icons@11.0.0/icons/${encodeURIComponent(s.icon)}.svg" alt="" style="${light ? '' : 'filter:invert(1)'}" onerror="this.replaceWith(document.createTextNode('${mono}'))">` : mono;
+  return `<span class="logo" style="background:${bg};${light ? 'color:#111' : ''}">${img}</span>`;
+}
+/* ---- flux en direct ---- */
+const LV = { es: null, paused: false, buf: [], count: [], svc: {}, devColor: {} };
+const NOISE = new Set(['apple', 'google', 'microsoft', 'amazon', 'meross', 'samsung', 'cdn', 'mozilla']);
+const DEVCOL = ['#5cc8e8', '#ff8a65', '#b9a3ff', '#7fe0c0', '#f28dc0', '#e8d08f', '#9fb4ff', '#7ccf7a', '#f0b54a'];
+const rootOf = d => { const p = d.split('.'); return p.length <= 2 ? d : (/^(co|com|org|gouv|net|ac)$/.test(p[p.length - 2]) ? p.slice(-3) : p.slice(-2)).join('.'); };
+function devName(ip) { const d = S.devices.find(x => x.ip === ip); return d ? pretty(d) : ip; }
+function devCol(ip) { if (!LV.devColor[ip]) LV.devColor[ip] = DEVCOL[Object.keys(LV.devColor).length % DEVCOL.length]; return LV.devColor[ip]; }
+async function lvHistory(more) {
+  // historique : les dernières requêtes enregistrées (survit aux redémarrages), puis plus ancien à la demande
+  const p = new URLSearchParams({ limit: '200' });
+  if (more && LV.oldest) p.set('before', LV.oldest);
+  if ($('#lvDev').value) p.set('ip', $('#lvDev').value);
+  if ($('#lvQ').value.trim()) p.set('q', $('#lvQ').value.trim().toLowerCase());
+  let rows; try { rows = await api('/api/agent/history?' + p); } catch { return; }
+  rows = rows.map(r => ({ t: r.t, ip: r.ip, d: r.domain, s: r.svc, n: r.n, site: r.site, c: r.c, b: r.b })).filter(lvFilter);
+  if (!rows.length) { if (more) toast('Rien de plus ancien dans les journaux.'); return; }
+  LV.oldest = rows[rows.length - 1].t;
+  const feed = $('#lvFeed'); if (!more) feed.innerHTML = ''; feed.querySelector('.empty')?.remove();
+  feed.insertAdjacentHTML('beforeend', rows.map(lvRow).join('').replaceAll('fr spawn', 'fr'));
+  for (const r of rows) if (!$(`#lvDev option[value="${CSS.escape(r.ip)}"]`)) $('#lvDev').insertAdjacentHTML('beforeend', `<option value="${esc(r.ip)}">${esc(devName(r.ip))}</option>`);
+}
+$('#lvMore').onclick = () => lvHistory(true);
+function lvStart() {
+  if (LV.es) return;
+  lvHistory(false);
+  LV.es = new EventSource('/api/agent/live');
+  LV.es.onmessage = e => { try { const r = JSON.parse(e.data); LV.count.push(Date.now()); if (!LV.paused) LV.buf.push(r); } catch { } };
+  LV.es.onerror = () => { $('#lvRate').textContent = 'flux interrompu, reconnexion…'; };
+}
+function lvStop() { if (LV.es) { LV.es.close(); LV.es = null; } }
+// Logo : favicon du site ; s'il n'existe pas, pastille avec l'initiale (couleur du service ou couleur stable du domaine)
+const hue = t => { let h = 0; for (const c of t) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
+function favImg(site, label, color) {
+  const ch = esc((label || '?').replace(/[^A-Za-z0-9]/g, '').slice(0, 1).toUpperCase() || '?');
+  const bg = color && lum(color) > 0.08 ? color : `hsl(${hue(site || label)} 45% 38%)`;
+  return `<span class="favw" style="--bg:${bg}"><img class="fav" src="/api/logo?d=${encodeURIComponent(site)}" alt="" loading="lazy" onerror="this.parentNode.classList.add('nofav')"><b>${ch}</b></span>`;
+}
+function lvRow(r) {
+  const s = r.n ? { name: r.n, site: r.site, color: r.c } : LV.svc[r.s], root = rootOf(r.d);
+  const known = s && r.s !== 'autres';
+  const host = esc(r.d.slice(0, Math.max(0, r.d.length - root.length)));
+  return `<div class="fr spawn${r.b ? ' blk' : ''}" data-ip="${esc(r.ip)}" data-d="${esc(r.d)}" data-root="${esc(root)}" data-s="${esc(r.s)}" data-n="${esc(s && r.s !== 'autres' ? s.name : '')}" title="Cliquer pour bloquer"><div class="tm">${new Date(r.t).toLocaleTimeString('fr-FR')}</div>
+    <div class="dv"><i style="background:${devCol(r.ip)}"></i><span title="${esc(r.ip)}">${esc(devName(r.ip))}</span></div>
+    ${favImg(known && s.site ? s.site : root, known ? s.name : root, known ? s.color : null)}
+    <div class="dm" title="${esc(r.d)}">${host}<b>${esc(root)}</b></div>
+    <div class="sv">${r.b ? '<span class="chip bad">bloqué</span>' : ''}${known ? esc(s.name) : '<span class="c-dim">site</span>'}</div></div>`;
+}
+function lvFilter(r) {
+  const dev = $('#lvDev').value, q = $('#lvQ').value.trim().toLowerCase();
+  if (dev && r.ip !== dev) return false;
+  if (q && !r.d.includes(q)) return false;
+  if ($('#lvNoise').checked && NOISE.has(r.s)) return false;
+  return true;
+}
+function lvFlush() {
+  const now = Date.now(); LV.count = LV.count.filter(t => t > now - 60000);
+  if (LV.es && $('#v-svc').classList.contains('on')) $('#lvRate').textContent = `${LV.count.length} requêtes / min${LV.paused ? ' · en pause' : ''}`;
+  if (!LV.buf.length) return;
+  const rows = LV.buf.splice(0).filter(lvFilter);
+  if (!rows.length) return;
+  const feed = $('#lvFeed'); const empty = feed.querySelector('.empty'); if (empty) empty.remove();
+  feed.insertAdjacentHTML('afterbegin', rows.reverse().map(lvRow).join(''));
+  while (feed.children.length > 2000) feed.lastElementChild.remove();
+  // la liste des appareils du filtre se complète au fil de l'eau
+  for (const r of rows) if (!$(`#lvDev option[value="${CSS.escape(r.ip)}"]`)) $('#lvDev').insertAdjacentHTML('beforeend', `<option value="${esc(r.ip)}">${esc(devName(r.ip))}</option>`);
+}
+setInterval(lvFlush, 200);
+$('#lvPause').onclick = () => { LV.paused = !LV.paused; $('#lvPause').textContent = LV.paused ? 'Reprendre' : 'Pause'; $('#lvPause').className = LV.paused ? 'btn sm primary' : 'btn sm'; };
+['#lvDev', '#lvQ', '#lvNoise'].forEach(id => $(id).addEventListener('input', () => { clearTimeout(LV.ft); LV.ft = setTimeout(() => { LV.oldest = null; $('#lvFeed').innerHTML = '<div class="empty">Recherche dans l\'historique…</div>'; lvHistory(false); }, 300); }));
+$$('#svcView button').forEach(b => b.onclick = () => { $$('#svcView button').forEach(x => x.setAttribute('aria-pressed', x === b)); const w = b.dataset.w; $('#svcLive').style.display = w === 'live' ? '' : 'none'; $('#svcSumView').style.display = w === 'sum' ? '' : 'none'; $('#svcBlk').style.display = w === 'blk' ? '' : 'none'; $('#svcAlr').style.display = w === 'alr' ? '' : 'none'; if (w === 'alr') loadAlerts(); $('#svcRange').style.visibility = w === 'sum' ? '' : 'hidden'; if (w === 'blk') loadBlocks(); });
+$('#svcRange').style.visibility = 'hidden';
+
+/* ---- blocages ---- */
+function ask(title, text, ok) {
+  return new Promise(res => {
+    $('#mT').textContent = title; $('#mP').textContent = text; $('#mL').innerHTML = ''; $('#mL').style.display = 'none';
+    $('#mYes').textContent = ok; $('#modal').classList.add('on'); $('#mNo').focus();
+    const done = v => { $('#modal').classList.remove('on'); $('#mL').style.display = ''; $('#mYes').onclick = $('#mNo').onclick = null; $('#mT').textContent = 'Une console est en train de jouer'; $('#mP').textContent = 'Le test va saturer le Wi‑Fi pendant plusieurs secondes. Le ping des consoles ci-dessous va monter le temps du test.'; $('#mYes').textContent = 'Lancer quand même'; res(v); };
+    $('#mYes').onclick = () => done(true); $('#mNo').onclick = () => done(false);
+  });
+}
+async function blockSite(o) { try { await api('/api/agent/blocks', o); toast(o.service ? `Service bloqué${o.ip ? ' pour ' + devName(o.ip) : ' pour tout le monde'}.` : `${o.domain} bloqué${o.ip ? ' pour ' + devName(o.ip) : ' pour tout le monde'}.`); loadBlocks(); } catch (e) { toast(e.message, true); } }
+async function blockDevice(d, on) {
+  if (on && !(await ask(`Bloquer ${pretty(d)} ?`, `L'appareil sera déconnecté du Wi‑Fi tout de suite et ne pourra plus se reconnecter tant que tu ne l'auras pas débloqué (onglet Services → Blocages, ou bouton Débloquer).`, 'Bloquer'))) return;
+  try { await api('/api/block-device', { mac: d.mac, name: pretty(d), block: on }); toast(on ? `${pretty(d)} est bloqué.` : `${pretty(d)} est débloqué, il peut se reconnecter.`); BK.devs = null; loadBlocks(); renderDevTable(); } catch (e) { toast(e.message, true); }
+}
+/* ---- mode priorité ---- */
+const PR = { cur: null };
+async function startPrio(d) {
+  const pr = ask(`Donner la priorité à ${pretty(d)} ?`, `Pendant la durée choisie, les autres appareils ne pourront plus lancer de vidéo (Netflix, YouTube, Twitch…), de téléchargement de jeu ni de mise à jour (PlayStation, Xbox, Steam, Epic, Apple, Windows). Ce qui tourne déjà s'arrête dans les minutes qui suivent. Tout revient tout seul à la fin.`, 'Donner la priorité');
+  $('#mL').style.display = ''; $('#mL').innerHTML = `<label style="display:flex;gap:10px;align-items:center">Durée <select id="prMin" class="search" style="height:32px;width:auto"><option value="30">30 min</option><option value="60" selected>1 h</option><option value="120">2 h</option><option value="240">4 h</option></select></label>`;
+  if (!(await pr)) return;
+  const minutes = +($('#prMin')?.value || 60);
+  try { await api('/api/agent/priority', { ip: d.ip, name: pretty(d), minutes }); toast(`${pretty(d)} est prioritaire pour ${minutes >= 60 ? minutes / 60 + ' h' : minutes + ' min'}.`); loadPrio(); } catch (e) { toast(e.message, true); }
+}
+async function loadPrio() {
+  try { PR.cur = await api('/api/agent/priority'); } catch { PR.cur = null; }
+  const bar = $('#prioBar'), c = PR.cur;
+  if (!c) { bar.style.display = 'none'; return; }
+  const m = Math.ceil(c.left / 60);
+  bar.style.display = 'flex';
+  bar.innerHTML = `<b>Mode priorité : ${esc(c.name)}</b><span class="c-dim">encore ${m >= 60 ? Math.floor(m / 60) + ' h ' + String(m % 60).padStart(2, '0') : m + ' min'} · ${nf0.format(c.hits || 0)} requête(s) coupée(s) chez les autres</span><span style="flex:1"></span><button class="btn sm" id="prStop">Arrêter maintenant</button>`;
+  $('#prStop').onclick = async () => { await api('/api/agent/priority', { stop: true }).catch(x => toast(x.message, true)); toast('Mode priorité arrêté, tout est revenu à la normale.'); loadPrio(); };
+}
+setInterval(() => { if ($('#v-devs').classList.contains('on')) loadPrio(); }, 5000);
+setTimeout(loadPrio, 1500);
+const BK = { sites: [], devs: null };
+async function loadBlocks() {
+  try { BK.sites = await api('/api/agent/blocks'); } catch { BK.sites = []; }
+  try { BK.devs = await api('/api/blocked-devices'); } catch { BK.devs = []; }
+  $('#blkCount').textContent = (BK.sites.length + BK.devs.length) || '';
+  // regroupe les domaines d'un même service bloqué
+  const groups = {}; for (const b of BK.sites) { const k = (b.service || b.domain) + '|' + (b.ip || ''); (groups[k] = groups[k] || []).push(b); }
+  $('#bkList').innerHTML = Object.values(groups).map(g => { const b = g[0]; const hits = g.reduce((a, x) => a + (x.hits || 0), 0);
+    return `<div class="bkr"><div><div style="display:flex;align-items:center;gap:8px">${favImg(b.service ? g[0].domain : b.domain, b.service || b.domain)}<b>${esc(b.service || b.domain)}</b></div><div class="m">${b.service ? g.length + ' domaines' : ''} ${b.ip ? '· pour ' + esc(devName(b.ip)) : '· pour tout le monde'}</div></div><span class="mono c-dim" style="font-size:var(--t-xs)">${hits} refus</span><button class="btn sm" data-unb='${esc(JSON.stringify(b.service ? { service: b.service, ip: b.ip } : { id: b.id }))}'>Débloquer</button></div>`; }).join('') || '<div class="empty">Aucun site bloqué.</div>';
+  $('#bdList').innerHTML = BK.devs.map(x => { const d = S.devices.find(y => (y.mac || '').toUpperCase() === x.mac.toUpperCase()); return `<div class="bkr"><div><b>${esc(d ? pretty(d) : x.comment.replace(/^Sonde - bloqué : /, ''))}</b><div class="m">${esc(x.mac)}</div></div><span></span><button class="btn sm" data-unbd="${esc(x.mac)}">Débloquer</button></div>`; }).join('') || '<div class="empty">Aucun appareil bloqué.</div>';
+  const sel = $('#bkWho'), cur = sel.value; sel.innerHTML = '<option value="">Pour tout le monde</option>' + S.devices.filter(d => d.ip).map(d => `<option value="${esc(d.ip)}">Pour ${esc(pretty(d))}</option>`).join(''); sel.value = cur;
+}
+$('#bkAdd').onclick = () => { const d = $('#bkDom').value.trim(); if (!d) return; blockSite({ domain: d, ip: $('#bkWho').value || null }); $('#bkDom').value = ''; };
+$('#bkList').addEventListener('click', async e => { const b = e.target.closest('[data-unb]'); if (!b) return; await api('/api/agent/blocks/delete', JSON.parse(b.dataset.unb)).catch(x => toast(x.message, true)); loadBlocks(); });
+$('#bdList').addEventListener('click', async e => { const b = e.target.closest('[data-unbd]'); if (!b) return; const mac = b.dataset.unbd; const d = S.devices.find(y => (y.mac || '').toUpperCase() === mac.toUpperCase()) || { id: mac, mac, name: mac }; blockDevice(d, false); });
+// menu de blocage sur une ligne du flux
+$('#lvFeed').addEventListener('click', e => {
+  const row = e.target.closest('.fr'); if (!row) return;
+  document.querySelector('.menu')?.remove();
+  const { ip, d, root, s: sid, n } = row.dataset, dev = devName(ip), devObj = S.devices.find(x => x.ip === ip);
+  const m = document.createElement('div'); m.className = 'menu';
+  m.innerHTML = `<div class="h">${esc(d)} · ${esc(dev)}</div>
+    <button data-a="site-all">Bloquer ${esc(root)} pour tout le monde</button>
+    <button data-a="site-dev">Bloquer ${esc(root)} pour ${esc(dev)}</button>
+    ${n && !['apple', 'google', 'microsoft', 'cdn', 'autres', 'inconnu'].includes(sid) ? `<button data-a="svc-all">Bloquer tout ${esc(n)} pour tout le monde</button><button data-a="svc-dev">Bloquer tout ${esc(n)} pour ${esc(dev)}</button>` : ''}
+    ${devObj && devObj.via !== 'cable' ? `<button data-a="dev" style="color:var(--bad)">Bloquer l'appareil ${esc(dev)} (coupe son Wi‑Fi)</button>` : ''}`;
+  document.body.appendChild(m);
+  const x = Math.min(e.clientX, innerWidth - 300), y = Math.min(e.clientY, innerHeight - m.offsetHeight - 10); m.style.left = x + 'px'; m.style.top = y + 'px';
+  m.onclick = ev => { const a = ev.target.dataset.a; if (!a) return; m.remove();
+    if (a === 'site-all') blockSite({ domain: root }); if (a === 'site-dev') blockSite({ domain: root, ip });
+    if (a === 'svc-all') blockSite({ service: sid }); if (a === 'svc-dev') blockSite({ service: sid, ip });
+    if (a === 'dev') blockDevice(devObj, true); };
+  setTimeout(() => document.addEventListener('click', function off(ev) { if (!m.contains(ev.target)) { m.remove(); document.removeEventListener('click', off); } }), 0);
+});
+
+/* ---- alertes Discord ---- */
+let CATALOG = null;
+async function loadAlerts() {
+  let a; try { a = await api('/api/agent/alerts'); } catch (e) { return toast(e.message, true); }
+  if (!CATALOG) { try { CATALOG = await api('/api/agent/catalog'); $('#alSvc').insertAdjacentHTML('beforeend', CATALOG.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('')); } catch { } }
+  $('#alWh').innerHTML = a.hasWebhook ? '<span class="c-ok">connecté</span>' : '<span class="c-warn">pas encore configuré</span>';
+  $('#alUrl').placeholder = a.hasWebhook ? a.webhook : 'https://discord.com/api/webhooks/…';
+  $('#tgSt').innerHTML = a.hasTelegram ? '<span class="c-ok">connecté</span>' : a.tgToken ? '<span class="c-warn">jeton enregistré, discussion à détecter</span>' : '<span class="c-warn">pas encore configuré</span>';
+  $('#alOv').checked = a.overload.enabled; $('#alMb').value = a.overload.deviceMbps; $('#alSec').value = a.overload.seconds; $('#alCd').value = a.cooldownMin;
+  const who = $('#alWho'), cur = who.value; who.innerHTML = '<option value="">N\'importe quel appareil</option>' + S.devices.filter(d => d.ip).map(d => `<option value="${esc(d.ip)}">${esc(pretty(d))}</option>`).join(''); who.value = cur;
+  $('#alRules').innerHTML = a.rules.map(r => `<div class="bkr"><div><div style="display:flex;align-items:center;gap:8px">${favImg(r.service ? (CATALOG || []).find(c => c.id === r.service)?.site || r.service : r.domain, r.serviceName || r.domain)}<b>${esc(r.serviceName || r.domain)}</b></div><div class="m">${r.ip ? 'seulement ' + esc(devName(r.ip)) : 'tous les appareils'}</div></div><span></span><button class="btn sm" data-del="${esc(r.id)}">Retirer</button></div>`).join('') || '<div class="empty">Aucune règle. Ajoute un service (TikTok, Fortnite…) ou un site.</div>';
+  $('#alLog').innerHTML = a.log.map(l => `<div class="bkr" style="grid-template-columns:70px 1fr"><span class="mono c-dim" style="font-size:var(--t-xs)">${new Date(l.t).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}<br>${new Date(l.t).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}</span><div><b>${esc(l.title)}</b><div class="m">${esc(l.desc.replace(/\*\*/g, ''))}</div></div></div>`).join('') || '<div class="empty">Aucune alerte pour l\'instant.</div>';
+}
+const alPost = async (o, msg) => { try { await api('/api/agent/alerts', o); if (msg) toast(msg); loadAlerts(); } catch (e) { toast(e.message, true); } };
+$('#alSave').onclick = () => { const u = $('#alUrl').value.trim(); alPost({ webhook: u }, u ? 'Webhook enregistré.' : 'Webhook retiré.'); $('#alUrl').value = ''; };
+$('#tgSave').onclick = () => { const t = $('#tgTok').value.trim(); alPost({ tgToken: t }, t ? 'Jeton enregistré. Envoie « bonjour » à ton bot, puis « Détecter la discussion ».' : 'Bot retiré.'); $('#tgTok').value = ''; };
+$('#tgDet').onclick = async () => { try { const r = await api('/api/agent/alerts', { tgDetect: true }); toast(`Discussion trouvée : ${r.chat}. Un message de confirmation vient d'être envoyé.`); loadAlerts(); } catch (e) { toast(e.message, true); } };
+$('#alTest').onclick = () => alPost({ test: true }, 'Message de test envoyé (Discord et Telegram s\'ils sont configurés).');
+$('#alOvSave').onclick = () => alPost({ overload: { enabled: $('#alOv').checked, deviceMbps: +$('#alMb').value, seconds: +$('#alSec').value }, cooldownMin: +$('#alCd').value }, 'Réglages enregistrés.');
+$('#alSvc').onchange = () => { $('#alDom').style.display = $('#alSvc').value ? 'none' : ''; };
+$('#alAdd').onclick = () => { const sv = $('#alSvc').value, d = $('#alDom').value.trim(); if (!sv && !d) return; alPost({ addRule: { service: sv || null, domain: d, ip: $('#alWho').value || null } }, 'Règle ajoutée.'); $('#alDom').value = ''; };
+$('#alRules').addEventListener('click', e => { const b = e.target.closest('[data-del]'); if (b) alPost({ delRule: b.dataset.del }); });
+
+function gate(html) { lvStop(); $('#svcGate').innerHTML = `<div class="gate panel" style="padding:22px 24px">${html}</div>`; $('#svcGate').style.display = ''; $('#svcMain').style.display = 'none'; $('#svcCtl').style.display = 'none'; }
+async function svcInit() {
+  clearInterval(SV.timer);
+  let st; try { st = await api('/api/agent/status'); } catch (e) { return gate(`<h2>Moteur injoignable</h2><p>${esc(e.message)}</p>`); }
+  if (!st.configured) return gate(`<h2>Installer l'agent DNS</h2><p>Cet onglet montre quels services (Netflix, YouTube, jeux…) utilise chaque appareil, avec leur logo, et permet de bloquer un site ou un service. Il faut pour ça un petit serveur DNS, « l'agent ». Choisis où l'installer :</p>
+    <div class="isp" style="margin:12px 0">
+      <div class="panel" style="padding:12px 14px"><b>Sur cet ordinateur</b> <span class="chip">le plus simple</span><p class="note" style="margin:6px 0">Actif seulement quand Sonde est ouvert. Sur chaque appareil à surveiller, mets en DNS 1 l'adresse de cet ordinateur et en DNS 2 celle de la box : quand Sonde est fermé, l'appareil repasse tout seul par la box.</p><button class="btn" id="agLocal">Activer sur cet ordinateur</button></div>
+      <div class="panel" style="padding:12px 14px"><b>Docker</b> (NAS, serveur, Raspberry Pi)<p class="note" style="margin:6px 0">Tourne en continu. Une seule commande sur la machine :</p><code class="mono" style="display:block;user-select:all;font-size:var(--t-xs);background:var(--panel-2);padding:8px;border-radius:var(--r)">curl -fsSL https://raw.githubusercontent.com/Nesaris/sonde/main/agent/install.sh | sudo bash -s -- --docker</code></div>
+      <div class="panel" style="padding:12px 14px"><b>Debian / Ubuntu Server</b>${st.box === 'freebox' ? ' (ou VM Debian sur la Freebox)' : ''}<p class="note" style="margin:6px 0">Tourne en continu, comme un service système. Une seule commande :</p><code class="mono" style="display:block;user-select:all;font-size:var(--t-xs);background:var(--panel-2);padding:8px;border-radius:var(--r)">curl -fsSL https://raw.githubusercontent.com/Nesaris/sonde/main/agent/install.sh | sudo bash</code></div>
+    </div>
+    <label for="agUrl">Adresse de l'agent installé (Docker ou Debian/Ubuntu)</label><input id="agUrl" placeholder="https://192.168.1.x:8443" autocomplete="off">
+    <div class="err" id="agErr"></div><button class="btn primary" id="agGo" style="margin-top:6px">Se connecter à l'agent</button>`) , bindConnect(), ($('#agLocal').onclick = async () => { $('#agLocal').disabled = true; $('#agLocal').textContent = 'Démarrage…'; try { await api('/api/agent/local', { on: true }); svcInit(); } catch (e) { $('#agErr').textContent = e.message; $('#agLocal').disabled = false; } });
+  if (!st.reachable) return gate(`<h2>Agent injoignable</h2><p>${esc(st.url)} ne répond pas : ${esc(st.error || '')}. ${st.local ? 'L\'agent de cet ordinateur ne démarre pas.' : 'La machine de l\'agent est peut-être arrêtée. Internet n\'est pas touché : la box reste DNS de secours.'}</p><button class="btn" id="agRetry">Réessayer</button> <button class="btn ghost" id="agForget">Choisir une autre installation</button>`), ($('#agRetry').onclick = svcInit), ($('#agForget').onclick = async () => { await api('/api/agent/local', { on: false }).catch(() => { }); await api('/api/agent/logout', {}).catch(() => { }); await api('/api/agent/forget', {}).catch(() => { }); svcInit(); });
+  if (st.setup) return gate(`<h2>Créer ton compte</h2><p>Premier lancement : choisis l'identifiant et le mot de passe qui protègent l'accès aux services et sites de la maison. Le mot de passe n'est jamais stocké en clair.</p>
+    <label for="suU">Identifiant</label><input id="suU" autocomplete="username">
+    <label for="suP">Mot de passe (10 caractères minimum)</label><input id="suP" type="password" autocomplete="new-password">
+    <label for="suP2">Confirmer le mot de passe</label><input id="suP2" type="password" autocomplete="new-password">
+    <div class="err" id="suErr"></div><button class="btn primary" id="suGo">Créer le compte</button>`), bindSetup();
+  if (!st.logged) return gate(`<h2>Connexion</h2><p>Accès protégé aux services et sites utilisés à la maison.</p>
+    <label for="liU">Identifiant</label><input id="liU" autocomplete="username" value="${esc(st.user || '')}">
+    <label for="liP">Mot de passe</label><input id="liP" type="password" autocomplete="current-password">
+    <div class="err" id="liErr"></div><button class="btn primary" id="liGo">Se connecter</button>`), bindLogin();
+  $('#svcGate').style.display = 'none'; $('#svcMain').style.display = ''; $('#svcCtl').style.display = '';
+  if (!st.fbx) $('#svcFoot').innerHTML = '<span class="c-warn">L\'agent n\'est pas encore autorisé sur la box : pas de volumes, seulement les services contactés.</span> <button class="btn sm" id="agFbx">Autoriser sur la box</button>';
+  loadServices(); lvStart(); SV.timer = setInterval(() => { if ($('#v-svc').classList.contains('on')) loadServices(); }, 10000);
+  const b = $('#agFbx'); if (b) b.onclick = async () => { b.disabled = true; b.textContent = 'Valide sur l\'écran de la box…'; try { await api('/api/agent/fbx/authorize', {}); } catch (e) { toast(e.message, true); } };
+}
+function bindConnect() { const go = async () => { $('#agErr').textContent = ''; try { await api('/api/agent/connect', { url: $('#agUrl').value.trim() }); svcInit(); } catch (e) { $('#agErr').textContent = e.message; } }; $('#agGo').onclick = go; $('#agUrl').onkeydown = e => { if (e.key === 'Enter') go(); }; }
+function bindSetup() {
+  const go = async () => {
+    const u = $('#suU').value.trim(), p1 = $('#suP').value, p2 = $('#suP2').value; $('#suErr').textContent = '';
+    if (p1 !== p2) return $('#suErr').textContent = 'Les deux mots de passe ne sont pas identiques.';
+    try { await api('/api/agent/setup', { user: u, pass: p1 }); await api('/api/agent/login', { user: u, pass: p1 }); svcInit(); } catch (e) { $('#suErr').textContent = e.message; }
+  };
+  $('#suGo').onclick = go; $('#suP2').onkeydown = e => { if (e.key === 'Enter') go(); };
+}
+function bindLogin() {
+  const go = async () => { $('#liErr').textContent = ''; $('#liGo').disabled = true; try { await api('/api/agent/login', { user: $('#liU').value.trim(), pass: $('#liP').value }); svcInit(); } catch (e) { $('#liErr').textContent = e.message; } $('#liGo').disabled = false; };
+  $('#liGo').onclick = go; $('#liP').onkeydown = e => { if (e.key === 'Enter') go(); }; setTimeout(() => ($('#liU').value ? $('#liP') : $('#liU')).focus(), 30);
+}
+$$('#svcRange button').forEach(b => { b.setAttribute('aria-pressed', b.dataset.r === SV.range); b.onclick = () => { $$('#svcRange button').forEach(x => x.setAttribute('aria-pressed', x === b)); SV.range = b.dataset.r; store.set('svcRange', SV.range); loadServices(); }; });
+$('#svcOut').onclick = async () => { await api('/api/agent/logout', {}).catch(() => { }); svcInit(); };
+async function loadServices() {
+  let r; try { r = await api('/api/agent/services?range=' + SV.range); } catch (e) { if (/Connexion requise/.test(e.message)) return svcInit(); return toast('Services : ' + e.message, true); }
+  for (const s of r.services || []) LV.svc[s.id] = s;
+  const raw = r.services || [];
+  // « Autres sites » éclaté : chaque site a sa propre ligne
+  const list = raw.flatMap(s => s.id !== 'autres' ? [s] : s.domains.map(d => ({ id: 'site:' + d.d, name: d.d, cat: 'Site', color: '#6F7681', icon: null, site: d.d, bytes: 0, queries: d.n, devices: [], active: [], domains: [] })));
+  const tot = list.reduce((a, s) => a + s.bytes, 0) + (raw.find(s => s.id === 'autres')?.bytes || 0), max = Math.max(1, ...list.map(s => s.bytes));
+  const liveN = list.filter(s => s.active.length).length;
+  const top = list.find(s => s.id !== 'inconnu' && s.id !== 'autres');
+  $('#svcSum').innerHTML = `
+    <div><div class="lb">Volume total (${({ '1h': 'dernière heure', '24h': '24 h', '7j': '7 jours', '30j': '30 jours', '1an': '1 an' })[SV.range]})</div><div class="v">${fmtB(tot)}</div></div>
+    <div><div class="lb">Services utilisés</div><div class="v">${list.filter(s => s.id !== 'inconnu').length}</div></div>
+    <div><div class="lb">Actifs maintenant</div><div class="v">${liveN}</div></div>
+    <div><div class="lb">Le plus gourmand</div><div class="v" style="font-size:var(--t-xl);display:flex;align-items:center;gap:10px">${top ? logo(top) + esc(top.name) : '—'}</div></div>`;
+  $('#svcList').innerHTML = list.length ? list.map(s => `<div class="svc${SV.open.has(s.id) ? ' open' : ''}" data-id="${esc(s.id)}">
+      ${logo(s)}
+      <div style="min-width:0"><div class="n">${esc(s.name)}${s.active.length ? '<span class="chip ok">en cours</span>' : ''}</div><div class="k">${esc(s.cat)}${s.queries ? ' · ' + nf0.format(s.queries) + ' requêtes' : ''}</div></div>
+      <div class="bar2"><i style="width:${Math.max(1, s.bytes / max * 100)}%;background:${lum(s.color || '#888') < 0.08 ? '#9aa3ad' : s.color}"></i></div>
+      <div class="vol">${fmtB(s.bytes)}</div>
+      <div class="who">${s.devices.slice(0, 6).map(d => `<span class="${d.now ? 'on' : ''}" title="${esc(fmtB(d.bytes))}">${esc(d.name)} · ${fmtB(d.bytes)}</span>`).join('') || '<span>—</span>'}${s.devices.length > 6 ? `<span>+${s.devices.length - 6}</span>` : ''}</div>
+      <div class="svc-det">${s.domains.map(d => `<span style="display:inline-flex;align-items:center;gap:6px;margin-right:14px"><img src="/api/logo?d=${encodeURIComponent(d.d.split('.').slice(-2).join('.'))}" alt="" style="width:14px;height:14px;border-radius:3px" onerror="this.remove()">${esc(d.d)} (${d.n})</span>`).join('') || 'aucun domaine'}</div></div>`).join('')
+    : '<div class="empty">Pas encore de données sur cette période. Elles arrivent dès que les appareils utilisent le DNS de l\'agent.</div>';
+  if (r.fbx && r.fbx.ok === false && !$('#agFbx')) $('#svcFoot').innerHTML = `<span class="c-warn">Box : ${esc(r.fbx.error || 'non autorisée')}</span>`;
+  else if (r.fbx?.ok) { $('#svcFoot').textContent = `Données depuis le ${new Date(r.since).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })} · actualisé toutes les 10 s · clique sur un service pour voir ses domaines · point vert = utilisé dans les 5 dernières minutes.`;
+    api('/api/agent/storage').then(st => { $('#svcFoot').textContent += ` · Clé de la VM : ${fmtB(st.free)} libres${st.total ? ' sur ' + fmtB(st.total) : ''}, journaux détaillés ${fmtB(st.logs)} sur ${st.days} jour(s)${st.oldest ? ' (depuis le ' + new Date(st.oldest).toLocaleDateString('fr-FR') + ')' : ''} — les plus anciens partent automatiquement quand la place manque.`; }).catch(() => { }); }
+}
+$('#svcList').addEventListener('click', e => { const r = e.target.closest('.svc'); if (!r) return; r.classList.toggle('open'); r.classList.contains('open') ? SV.open.add(r.dataset.id) : SV.open.delete(r.dataset.id); });
+
+/* ============ SCAN ============ */
+const ICON = {
+  console: '<path d="M6 9h12a3 3 0 0 1 3 3v3a2.5 2.5 0 0 1-4.6 1.4L15 14H9l-1.4 2.4A2.5 2.5 0 0 1 3 15v-3a3 3 0 0 1 3-3z"/><path d="M8 11v2M7 12h2"/><circle cx="16" cy="11.5" r=".6"/><circle cx="17.5" cy="13" r=".6"/>',
+  phone: '<rect x="7" y="3" width="10" height="18" rx="2"/><path d="M11 18h2"/>',
+  laptop: '<rect x="5" y="5" width="14" height="10" rx="1"/><path d="M3 18h18"/>',
+  desktop: '<rect x="3" y="4" width="18" height="12" rx="1"/><path d="M9 20h6M12 16v4"/>',
+  tv: '<rect x="3" y="5" width="18" height="12" rx="1"/><path d="M8 20h8"/>',
+  plug: '<path d="M9 3v4M15 3v4M7 7h10v4a5 5 0 0 1-10 0z"/><path d="M12 16v5"/>',
+  appliance: '<rect x="5" y="3" width="14" height="18" rx="2"/><circle cx="12" cy="13" r="4"/><path d="M8 6h2"/>',
+  speaker: '<rect x="6" y="3" width="12" height="18" rx="2"/><circle cx="12" cy="14" r="3"/><circle cx="12" cy="7" r="1"/>',
+  net: '<rect x="3" y="13" width="18" height="6" rx="1"/><path d="M7 16h.01M11 16h.01M8 13l-2-5M16 13l2-5"/>',
+  other: '<circle cx="12" cy="12" r="8"/><path d="M12 8v5M12 16h.01"/>'
+};
+const TYPE = {
+  vg_console: ['Console', 'console'], smartphone: ['Téléphone', 'phone'], tablet: ['Tablette', 'phone'], laptop: ['Portable', 'laptop'], workstation: ['Ordinateur', 'desktop'],
+  television: ['Télévision', 'tv'], freebox_player: ['Lecteur Freebox', 'tv'], freebox_pop: ['Lecteur Freebox', 'tv'], multimedia_device: ['Multimédia', 'speaker'],
+  printer: ['Imprimante', 'desktop'], appliances: ['Électroménager', 'appliance'], outlet: ['Prise connectée', 'plug'], networking_device: ['Réseau', 'net'], ip_camera: ['Caméra', 'other'], other: ['Autre', 'other']
+};
+const typeOf = d => { if (/tv/i.test(d.name) && d.type === 'smartphone') return TYPE.television; if (/ubiquiti/i.test(d.vendor || d.name)) return TYPE.networking_device; return TYPE[d.type] || TYPE.other; };
+const ico = k => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON[k] || ICON.other}</svg>`;
+const viaTxt = d => d.via === 'cable' ? `câble · ${d.linkTx ? nf0.format(d.linkTx) + ' Mb/s' : ''}` : `${d.via === 'repeteur' ? 'répéteur' : 'box'} · ${bandTxt(d.band)} · <span class="sig ${sigCls(d.signal)}">${d.signal ?? '—'} dBm</span>`;
+function card(d, opts = {}) {
+  const [tl, ik] = typeOf(d);
+  const p = d.ping || {};
+  const pm = d.ip && p.n ? (p.loss === 100 ? '<span class="c-dim">pas de réponse</span>' : `<span>moy <b class="${pingCls(p.avg)}">${ms(p.avg)}</b> ms</span><span>max <b class="${p.max > 100 ? 'c-bad' : p.max > 40 ? 'c-warn' : ''}">${ms(p.max)}</b></span><span class="${p.loss > 0 ? 'c-warn' : ''}">${nf0.format(p.loss)} % perdus</span>`) : '';
+  return `<div class="card${S.sel.has(d.id) && !opts.gone ? ' sel' : ''}${opts.gone ? ' gone' : ''}" data-id="${esc(d.id)}" title="${opts.gone ? '' : 'Cliquer pour cocher / décocher'}">
+    <div class="ic">${ico(ik)}</div>
+    <div style="min-width:0"><div class="ty"><span class="chip">${tl}</span>${opts.isNew ? '<span class="chip acc">Nouveau</span>' : ''}${opts.gone ? '<span class="chip bad">Disparu</span>' : ''}${d.gaming ? '<span class="chip warn">en jeu</span>' : ''}</div>
+    <div class="nm" title="${esc(d.name)}">${esc(pretty(d))}</div><div class="ip">${esc(d.ip || 'sans IP')}${opts.gone ? '' : ' · ' + viaTxt(d)}</div>
+    ${pm ? `<div class="ms">${pm}</div>` : ''}</div></div>`;
+}
+async function loadScans(pick) {
+  let list = []; try { list = await api('/api/scans'); } catch { }
+  $('#scanPick').innerHTML = list.length ? list.map(x => `<option value="${x.i}">${new Date(x.date).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })} · ${x.n} app.</option>`).join('') : '<option>Aucun scan</option>';
+  $('#scanPick').disabled = !list.length;
+  if (list.length) showScan(pick ?? 0);
+}
+$('#scanPick').onchange = e => showScan(+e.target.value);
+async function showScan(i) {
+  const x = await api('/api/scans/' + i); S.scan = x;
+  const ok = x.devices.filter(d => d.ping && d.ping.n && d.ping.loss < 100);
+  const avgAll = ok.length ? ok.reduce((a, d) => a + d.ping.avg, 0) / ok.length : null;
+  const nb = k => x.devices.filter(d => d.via === k).length;
+  const lvl = l => x.alerts.filter(a => a.level === l).length;
+  $('#scanSum').innerHTML = `
+    <div><div class="lb">Scan du ${new Date(x.date).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short' })}</div><div class="ft mono" style="font-size:var(--t-xs);color:var(--text-3);margin-top:8px">${x.first ? 'premier scan : rien à comparer' : 'comparé au ' + new Date(x.prevDate).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}<br>Mac → box : ${ms(x.ref?.avg)} ms moy · ${ms(x.ref?.max)} ms max</div></div>
+    <div><div class="lb">Appareils scannés</div><div class="v">${x.devices.length}</div><div class="chips"><span class="chip">${nb('cable')} câble</span><span class="chip">${nb('box')} box</span><span class="chip">${nb('repeteur')} répéteur</span></div></div>
+    <div><div class="lb">Nouveaux appareils</div><div class="v">${x.added.length && !x.first ? x.added.length : 0}</div><div class="chips">${x.removed.length ? `<span class="chip bad">${x.removed.length} disparu(s)</span>` : '<span class="chip">aucun disparu</span>'}</div></div>
+    <div><div class="lb">Changements</div><div class="v">${x.changes.length}</div><div class="chips"><span class="chip">IP, bande, point d'accès, signal</span></div></div>
+    <div><div class="lb">Alertes</div><div class="v ${lvl('bad') ? 'c-bad' : lvl('warn') ? 'c-warn' : 'c-ok'}">${x.alerts.filter(a => a.level !== 'info').length}</div><div class="chips">${lvl('bad') ? `<span class="chip bad">${lvl('bad')} grave</span>` : ''}${lvl('warn') ? `<span class="chip warn">${lvl('warn')} à surveiller</span>` : ''}${lvl('info') ? `<span class="chip">${lvl('info')} info</span>` : ''}${!x.alerts.length ? '<span class="chip ok">rien à signaler</span>' : ''}</div></div>`;
+  const isNew = new Set(x.first ? [] : x.added);
+  const groups = [['Consoles', d => d.isConsole], ['En câble', d => !d.isConsole && d.via === 'cable'], ['Wi‑Fi de la box', d => !d.isConsole && d.via === 'box'], ['Wi‑Fi du répéteur', d => !d.isConsole && d.via === 'repeteur']];
+  let h = '';
+  if (x.alerts.length) h += `<details class="sec" open><summary><span>Alertes<span class="c">${x.alerts.length}</span></span></summary><div class="panel" style="margin-top:10px"><div class="panel-b verdict">${x.alerts.map(a => `<div class="vd ${a.level}"><i></i><span>${esc(a.text)}</span></div>`).join('')}</div></div></details>`;
+  if (isNew.size) h += `<details class="sec" open><summary><span>Nouveaux appareils<span class="c">${isNew.size}</span></span></summary><div class="cards">${x.devices.filter(d => isNew.has(d.id)).map(d => card(d, { isNew: true })).join('')}</div></details>`;
+  for (const [t, f] of groups) { const g = x.devices.filter(f); if (g.length) h += `<details class="sec" open><summary><span>${t}<span class="c">${g.length}</span></span></summary><div class="cards">${g.map(d => card(d, { isNew: isNew.has(d.id) })).join('')}</div></details>`; }
+  if (x.removed.length) h += `<details class="sec"><summary><span>Appareils disparus depuis le scan précédent<span class="c">${x.removed.length}</span></span></summary><div class="cards">${x.removed.map(d => card(d, { gone: true })).join('')}</div></details>`;
+  if (x.changes.length) h += `<details class="sec"><summary><span>Changements<span class="c">${x.changes.length}</span></span></summary><div class="panel" style="margin-top:10px;overflow:auto"><table class="t"><thead><tr><th>Appareil</th><th>Quoi</th><th>Avant</th><th>Maintenant</th></tr></thead><tbody>${x.changes.map(c => `<tr><td>${esc(c.name)}</td><td style="font-family:var(--sans)">${esc(c.field)}</td><td class="c-dim">${esc(c.from ?? '—')}</td><td>${esc(c.to ?? '—')}</td></tr>`).join('')}</tbody></table></div></details>`;
+  $('#scanBody').innerHTML = h;
+}
+$('#scanBody').addEventListener('click', e => {
+  const c = e.target.closest('.card'); if (!c || c.classList.contains('gone')) return;
+  const d = S.devices.find(x => x.id === c.dataset.id) || S.scan?.devices.find(x => x.id === c.dataset.id); if (!d?.ip) return;
+  S.sel.has(d.id) ? S.sel.delete(d.id) : S.sel.add(d.id); store.set('sel', [...S.sel]); c.classList.toggle('sel'); renderRack();
+});
+$('#bScan').onclick = async () => {
+  const b = $('#bScan'); b.disabled = true; b.innerHTML = '<span class="spin"></span> Scan…'; $('#rScan').classList.add('on');
+  try { await api('/api/scan', {}); await loadScans(0); } catch (e) { toast('Scan : ' + e.message, true); }
+  b.disabled = false; b.textContent = 'Lancer un scan'; $('#rScan').classList.remove('on');
+};
+function onScan(e) { if (e.state === 'run') $('#bScan').innerHTML = `<span class="spin"></span> ${esc(e.step)}…`; }
+
+/* ============ RAPPORTS / COMPARER ============ */
+const REPC = ['#9aa3ad', '#f0b54a', '#b9a3ff', '#5cc8e8', '#7fe0c0', '#f28dc0', '#ff8a65', '#e8d08f'];
+const C = { reports: [], sel: new Set(store.get('cmpSel', [])), devs: new Set(store.get('cmpDevs', [])), metric: 'avg', series: {} };
+const repColor = r => REPC[C.reports.indexOf(r) % REPC.length];
+const METRIC = {
+  avg: { l: 'Ping moyen', u: 'ms', better: 'low', f: v => ms(v) + ' ms' },
+  min: { l: 'Ping min', u: 'ms', better: 'low', f: v => ms(v) + ' ms' },
+  max: { l: 'Ping max', u: 'ms', better: 'low', f: v => ms(v) + ' ms' },
+  spikesPerMin: { l: 'Pics > 60 ms / min', u: '/min', better: 'low', f: v => nf1.format(v) + ' /min' },
+  loss: { l: 'Pertes', u: '%', better: 'low', f: v => nf1.format(v) + ' %' },
+  link: { l: 'Lien / débit', u: 'Mb/s', better: 'high', f: v => nf0.format(v) + ' Mb/s' }
+};
+function openSave(from) {
+  return new Promise(res => {
+    const d = $('#saveDlg'); $('#sName').value = ''; d.classList.add('on'); setTimeout(() => $('#sName').focus(), 30);
+    const done = async ok => {
+      d.classList.remove('on'); $('#sYes').onclick = $('#sNo').onclick = $('#sName').onkeydown = null;
+      if (!ok) return res(null);
+      const name = $('#sName').value.trim() || ('Test du ' + new Date().toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' }));
+      try { const r = await api('/api/reports/save', { name, from }); toast(`Rapport « ${r.name} » enregistré. Il est coché dans Comparer.`); C.sel.add(r.id); store.set('cmpSel', [...C.sel]); res(r); }
+      catch (e) { toast(e.message, true); res(null); }
+    };
+    $('#sYes').onclick = () => done(true); $('#sNo').onclick = () => done(false);
+    $('#sName').onkeydown = e => { if (e.key === 'Enter') done(true); if (e.key === 'Escape') done(false); };
+  });
+}
+$('#bSavePing').onclick = () => openSave('ping');
+$('#bSaveFull').onclick = () => openSave('full');
+const IC_EDIT = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>';
+const IC_DEL = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"/></svg>';
+async function loadReports() {
+  try { C.reports = await api('/api/reports'); } catch (e) { return toast(e.message, true); }
+  C.reports.sort((a, b) => (a.kind === 'test') - (b.kind === 'test') || String(a.date).localeCompare(b.date));
+  $('#repCount').textContent = C.reports.length + ' enregistrés';
+  // premier passage : on affiche les derniers rapports et leurs consoles (ou leurs premiers appareils)
+  if (!C.sel.size && C.reports.length) C.reports.slice(-3).forEach(r => C.sel.add(r.id));
+  if (!C.devs.size) { const names = [...new Set(C.reports.flatMap(r => Object.keys(r.devices || {})))].filter(n => !/référence|Internet/.test(n)); (names.filter(n => /ps5|ps4|xbox|switch/i.test(n)).length ? names.filter(n => /ps5|ps4|xbox|switch/i.test(n)) : names).slice(0, 4).forEach(n => C.devs.add(n)); }
+  const kindTag = r => r.kind === 'estimate' ? '<span class="chip warn">estimation</span>' : r.kind === 'import' ? '<span class="chip">repris</span>' : '<span class="chip acc">mesuré</span>';
+  $('#repList').innerHTML = C.reports.map(r => `<div class="rep" data-id="${esc(r.id)}">
+    <input type="checkbox" ${C.sel.has(r.id) ? 'checked' : ''} tabindex="-1" aria-label="Afficher ${esc(r.name)}">
+    <span class="sw" style="background:${repColor(r)}"></span>
+    <div style="min-width:0"><div class="n" title="${esc(r.note || '')}">${esc(r.name)}</div><div class="d">${new Date(r.date).toLocaleDateString('fr-FR')}${r.durationS ? ' · ' + Math.round(r.durationS / 60 * 10) / 10 + ' min' : ''} ${kindTag(r)}</div></div>
+    <div class="acts"><button class="ib" data-a="ren" title="Renommer">${IC_EDIT}</button><button class="ib" data-a="del" title="Supprimer">${IC_DEL}</button></div></div>`).join('');
+  const names = [...new Set(C.reports.flatMap(r => Object.keys(r.devices)))].sort((a, b) => (/PS5/.test(b) - /PS5/.test(a)) || a.localeCompare(b));
+  $('#cmpDevs').innerHTML = names.map(n => `<button class="chipbtn" data-n="${esc(n)}" aria-pressed="${C.devs.has(n)}">${esc(n)}</button>`).join('');
+  const cur = $('#curDev').value;
+  $('#curDev').innerHTML = names.map(n => `<option ${n === cur ? 'selected' : ''}>${esc(n)}</option>`).join('');
+  await loadSeries(); renderCmp();
+}
+async function loadSeries() {
+  for (const r of C.reports) if (C.sel.has(r.id) && !C.series[r.id] && Object.values(r.devices).some(d => d.series)) {
+    try { C.series[r.id] = await api('/api/reports/series/' + r.id); } catch { }
+  }
+}
+$('#repList').addEventListener('click', async e => {
+  const row = e.target.closest('.rep'); if (!row) return;
+  const r = C.reports.find(x => x.id === row.dataset.id);
+  const a = e.target.closest('.ib')?.dataset.a;
+  if (a === 'ren') { const n = prompt('Nouveau nom du rapport', r.name); if (n && n.trim()) { await api('/api/reports/rename', { id: r.id, name: n.trim() }); loadReports(); } return; }
+  if (a === 'del') { if (confirm(`Supprimer le rapport « ${r.name} » ? C'est définitif.`)) { await api('/api/reports/delete', { id: r.id }); C.sel.delete(r.id); store.set('cmpSel', [...C.sel]); loadReports(); } return; }
+  C.sel.has(r.id) ? C.sel.delete(r.id) : C.sel.add(r.id); store.set('cmpSel', [...C.sel]);
+  row.querySelector('input').checked = C.sel.has(r.id); await loadSeries(); renderCmp();
+});
+$('#cmpDevs').addEventListener('click', e => { const b = e.target.closest('.chipbtn'); if (!b) return; const n = b.dataset.n; C.devs.has(n) ? C.devs.delete(n) : C.devs.add(n); b.setAttribute('aria-pressed', C.devs.has(n)); store.set('cmpDevs', [...C.devs]); renderCmp(); });
+$$('#cmpMetric button').forEach(b => b.onclick = () => { $$('#cmpMetric button').forEach(x => x.setAttribute('aria-pressed', x === b)); C.metric = b.dataset.k; renderCmp(); });
+$('#curDev').onchange = renderCurves; $('#curScale').onchange = renderCurves;
+const selReports = () => C.reports.filter(r => C.sel.has(r.id));
+function renderCmp() { drawBars(); renderCurves(); renderCmpTable(); }
+function canvasCtx(cv) {
+  const dpr = devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+  cv.width = W * dpr; cv.height = H * dpr; const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  g.font = '11px "IBM Plex Mono", ui-monospace, monospace'; return { g, W, H };
+}
+const niceStep = n => { const p = 10 ** Math.floor(Math.log10(n || 1)); const f = n / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p; };
+function drawBars() {
+  const cv = $('#cBars'); if (!cv.offsetParent) return;
+  const { g, W, H } = canvasCtx(cv);
+  const reps = selReports(), devs = [...C.devs].filter(n => reps.some(r => r.devices[n]));
+  const k = C.metric, M = METRIC[k];
+  $('#barTitle').textContent = M.l + (M.better === 'low' ? ' · plus bas = mieux' : ' · plus haut = mieux');
+  $('#barLegend').innerHTML = reps.map(r => `<span><i style="background:${repColor(r)};height:8px;width:8px;border-radius:2px"></i>${esc(r.name)}${r.kind === 'estimate' ? ' (estimation)' : ''}</span>`).join('');
+  if (!reps.length || !devs.length) { g.fillStyle = css('--text-3'); g.textAlign = 'center'; g.fillText('Coche au moins un rapport et un appareil.', W / 2, H / 2); return; }
+  let max = 1; for (const r of reps) for (const n of devs) { const v = r.devices[n]?.[k]; if (v != null && v > max) max = v; }
+  const cap = k === 'max' ? Math.min(max, 400) : max;
+  const step = niceStep(cap / 4); const top = Math.ceil(cap * 1.08 / step) * step;
+  const L = 56, R = 10, T = 14, B = 34, w = W - L - R, h = H - T - B;
+  const Y = v => T + h - Math.min(v, top) / top * h;
+  g.strokeStyle = css('--line'); g.fillStyle = css('--text-3'); g.textBaseline = 'middle'; g.textAlign = 'right';
+  for (let v = 0; v <= top + 1e-9; v += step) { const y = Math.round(Y(v)) + .5; g.beginPath(); g.moveTo(L, y); g.lineTo(L + w, y); g.stroke(); g.fillText(nf0.format(v) + (M.u === 'ms' ? ' ms' : M.u === '%' ? ' %' : ''), L - 8, y); }
+  const gw = w / devs.length, pad = Math.min(36, gw * .18), bw = Math.min(46, (gw - pad * 2) / reps.length - 4);
+  devs.forEach((n, i) => {
+    const x0 = L + i * gw + (gw - (bw + 4) * reps.length + 4) / 2;
+    g.fillStyle = css('--text-2'); g.textAlign = 'center'; g.textBaseline = 'top'; g.font = '12px "IBM Plex Sans", sans-serif';
+    g.fillText(n, L + i * gw + gw / 2, T + h + 10); g.font = '11px "IBM Plex Mono", ui-monospace, monospace';
+    reps.forEach((r, j) => {
+      const v = r.devices[n]?.[k]; const x = x0 + j * (bw + 4);
+      if (v == null) { g.fillStyle = css('--text-3'); g.textBaseline = 'bottom'; g.fillText('n.m.', x + bw / 2, T + h - 2); return; }
+      const y = Y(v), col = repColor(r);
+      if (r.kind === 'estimate') { g.setLineDash([4, 3]); g.strokeStyle = col; g.lineWidth = 1.5; g.strokeRect(x + .75, y + .75, bw - 1.5, T + h - y - 1.5); g.setLineDash([]); g.globalAlpha = .18; g.fillStyle = col; g.fillRect(x, y, bw, T + h - y); g.globalAlpha = 1; }
+      else { g.fillStyle = col; g.fillRect(x, y, bw, T + h - y); }
+      g.fillStyle = css('--text'); g.textBaseline = 'bottom'; g.textAlign = 'center';
+      g.fillText((v > top ? '↑' : '') + (k === 'link' && v >= 1000 ? nf1.format(v / 1000) + 'G' : k === 'spikesPerMin' || k === 'loss' ? nf1.format(v) : nf0.format(Math.round(v))), x + bw / 2, Math.max(y, T + 12) - 3);
+    });
+  });
+}
+function renderCurves() {
+  const cv = $('#cCurves'); if (!cv.offsetParent) return;
+  const { g, W, H } = canvasCtx(cv);
+  const dev = $('#curDev').value;
+  const reps = selReports();
+  const withS = reps.filter(r => C.series[r.id]?.[dev]?.length);
+  const without = reps.filter(r => !withS.includes(r));
+  $('#curLegend').innerHTML = withS.map(r => `<span><i style="background:${repColor(r)}"></i>${esc(r.name)}</span>`).join('') + (without.length ? `<span class="c-dim">Sans courbe : ${without.map(r => esc(r.name)).join(', ')} (rapports résumés, seule la moyenne est tracée en pointillés)</span>` : '');
+  let tMax = 60, vMax = 20;
+  for (const r of withS) for (const [t, v] of C.series[r.id][dev]) { if (t > tMax) tMax = t; if (v != null && v > vMax) vMax = v; }
+  for (const r of without) { const a = r.devices[dev]?.avg; if (a != null && a > vMax) vMax = a; }
+  const sc = $('#curScale').value; if (sc !== 'auto') vMax = +sc; else vMax = Math.min(vMax, 300);
+  const step = niceStep(vMax / 4), top = Math.ceil(vMax * 1.05 / step) * step;
+  const L = 56, R = 10, T = 10, B = 24, w = W - L - R, h = H - T - B;
+  const X = t => L + t / tMax * w, Y = v => T + h - Math.min(v, top) / top * h;
+  g.strokeStyle = css('--line'); g.fillStyle = css('--text-3'); g.textBaseline = 'middle'; g.textAlign = 'right';
+  for (let v = 0; v <= top + 1e-9; v += step) { const y = Math.round(Y(v)) + .5; g.beginPath(); g.moveTo(L, y); g.lineTo(L + w, y); g.stroke(); g.fillText(nf0.format(v) + ' ms', L - 8, y); }
+  g.textAlign = 'center'; g.textBaseline = 'top';
+  const ts = niceStep(tMax / 6); for (let t = 0; t <= tMax; t += ts) g.fillText(t >= 60 ? (Math.round(t / 6) / 10) + ' min' : t + ' s', X(t), T + h + 6);
+  for (const r of without) { const a = r.devices[dev]?.avg; if (a == null) continue; const y = Math.round(Y(a)) + .5; g.setLineDash([5, 4]); g.strokeStyle = repColor(r); g.lineWidth = 1.4; g.beginPath(); g.moveTo(L, y); g.lineTo(L + w, y); g.stroke(); g.setLineDash([]); }
+  g.save(); g.beginPath(); g.rect(L, T - 2, w, h + 4); g.clip();
+  for (const r of withS) {
+    g.strokeStyle = repColor(r); g.lineWidth = 1.5; g.beginPath(); let pen = false;
+    for (const [t, v] of C.series[r.id][dev]) { if (v == null) { pen = false; g.fillStyle = css('--bad'); g.fillRect(X(t) - 1, T, 2, 5); continue; } const x = X(t), y = Y(v); pen ? g.lineTo(x, y) : g.moveTo(x, y); pen = true; }
+    g.stroke();
+  }
+  g.restore();
+  if (!reps.length) { g.fillStyle = css('--text-3'); g.textAlign = 'center'; g.fillText('Coche des rapports à gauche.', W / 2, H / 2); }
+}
+function renderCmpTable() {
+  const reps = selReports(), devs = [...C.devs].filter(n => reps.some(r => r.devices[n]));
+  if (!reps.length || !devs.length) { $('#cmpTable').innerHTML = '<div class="empty">Rien à comparer.</div>'; return; }
+  const base = reps[0];
+  const keys = ['avg', 'min', 'max', 'spikesPerMin', 'loss', 'link'];
+  const txt = (d, k) => d?.[k + 'Txt'] || (d?.[k] != null ? METRIC[k].f(d[k]) : '—');
+  let h = '';
+  for (const n of devs) {
+    h += `<table class="t" style="margin-bottom:6px"><thead><tr><th>${esc(n)}</th>${reps.map(r => `<th><span class="sw" style="background:${repColor(r)}"></span>${esc(r.name)}</th>`).join('')}</tr></thead><tbody>`;
+    h += `<tr><td style="color:var(--text-2);font-weight:400">Connexion</td>${reps.map(r => `<td style="font-family:var(--sans);color:var(--text-2)">${esc(r.devices[n]?.conn || '—')}</td>`).join('')}</tr>`;
+    for (const k of keys) {
+      h += `<tr><td style="color:var(--text-2);font-weight:400">${METRIC[k].l}</td>` + reps.map((r, j) => {
+        const d = r.devices[n], v = d?.[k], b = base.devices[n]?.[k];
+        let dl = '';
+        if (j > 0 && v != null && b != null && b !== v) {
+          const better = METRIC[k].better === 'low' ? v < b : v > b;
+          const pct = b ? Math.round((v - b) / b * 100) : null;
+          dl = `<span class="delta ${better ? 'c-ok' : 'c-bad'}">${v > b ? '+' : ''}${pct != null && isFinite(pct) ? pct + ' %' : ''}</span>`;
+        }
+        return `<td>${esc(txt(d, k))}${dl}</td>`;
+      }).join('') + '</tr>';
+    }
+    h += '</tbody></table>';
+  }
+  $('#cmpTable').innerHTML = h;
+}
+new ResizeObserver(() => { if ($('#v-cmp').classList.contains('on')) { drawBars(); renderCurves(); } }).observe($('#v-cmp'));
+
+/* ============ HISTORIQUE ============ */
+async function loadHist() {
+  let h = []; try { h = await api('/api/history'); } catch { }
+  const kind = { full: 'Test complet', load: 'Surcharge', nq: 'Test Apple' };
+  $('#hTable tbody').innerHTML = h.length ? h.map(e => {
+    const dt = new Date(e.date).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' });
+    const boxD = e.kind === 'full' ? e.down?.boxDownMax : e.boxDownMax;
+    const mD = e.kind === 'full' ? e.down?.macDownAvg : e.kind === 'nq' ? e.down : e.macDownAvg;
+    const mU = e.kind === 'full' ? e.up?.macUpAvg : e.kind === 'nq' ? e.up : e.macUpAvg;
+    const inet = e.kind === 'full' ? e.idle?.inet?.raw?.avg : e.kind === 'nq' ? e.idle : null;
+    const det = e.kind === 'full' ? (e.verdict || []).filter(v => v.level === 'bad' || v.level === 'warn').length + ' point(s) à surveiller' : e.kind === 'load' ? `${e.flows} flux · ${e.duration} s · ${({ down: 'réception', up: 'envoi', both: 'les deux' })[e.mode]}` : (e.rpmDown ? e.rpmDown + ' RPM' : '');
+    return `<tr><td class="mono" style="font-family:var(--mono);font-weight:400">${dt}</td><td style="text-align:right;font-family:var(--sans)">${kind[e.kind] || e.kind}</td><td>${rateT(boxD)}</td><td>${rateT(mD)}</td><td>${rateT(mU)}</td><td class="${pingCls(inet)}">${inet != null ? ms(inet) + ' ms' : '—'}</td><td style="font-family:var(--sans);color:var(--text-2)">${esc(det)}</td></tr>`;
+  }).join('') : '<tr><td colspan="7" class="empty">Aucun test enregistré pour l\'instant.</td></tr>';
+}
+$('#bHist').onclick = loadHist;
+
+/* ============ assistant de premier lancement ============ */
+const WZ = { step: 'isp', isp: null, det: null, setup: null };
+const stepsBar = n => `<div class="wsteps">${['Opérateur', 'Box', 'Connexion'].map((l, i) => `<span class="${i === n ? 'on' : ''}">${i + 1}. ${l}</span>`).join('')}</div>`;
+async function openWizard(step) {
+  WZ.setup = await api('/api/setup').catch(() => null);
+  if (!WZ.setup) return toast('Moteur injoignable', true);
+  $('nav.tabs').style.display = 'none'; show('auth');
+  if (step) WZ.step = step;
+  else if (WZ.setup.config && !WZ.setup.configured) { WZ.step = 'auth'; WZ.isp = WZ.setup.config.isp; }
+  else WZ.step = 'isp';
+  renderWizard();
+}
+function renderWizard() {
+  const w = $('#wiz'), su = WZ.setup;
+  if (WZ.step === 'isp') {
+    w.innerHTML = `${stepsBar(0)}<h1>Quel est ton opérateur ?</h1><p>Sonde lit les appareils, le Wi‑Fi et le débit directement dans ta box. Le ping, les tests de débit et les rapports marchent avec toutes les box.</p>
+      <div class="isp">${su.isps.map(i => `<button data-isp="${esc(i.id)}" aria-pressed="${WZ.isp === i.id}"><b>${esc(i.label)}</b><span class="chip ${i.level === 'complet' ? 'ok' : ''}">${esc(i.level)}</span><span class="m">${esc(i.models)} · connexion : ${esc(i.auth)}</span></button>`).join('')}</div>
+      <p class="note" style="font-size:var(--t-xs)">« Expérimental » : écrit à partir de la documentation de la box, pas encore testé sur toutes les versions. Si quelque chose ne marche pas, Sonde passe en mode générique (ping et débit seulement).</p>`;
+    $$('#wiz [data-isp]').forEach(b => b.onclick = () => { WZ.isp = b.dataset.isp; WZ.step = 'detect'; renderWizard(); });
+    return;
+  }
+  if (WZ.step === 'detect') {
+    w.innerHTML = `${stepsBar(1)}<h1>Recherche de ta box…</h1><p>Sonde interroge la passerelle de ton réseau${su.gateway ? ` (${esc(su.gateway)})` : ''}.</p>`;
+    api('/api/setup/detect', { isp: WZ.isp }).then(d => { WZ.det = d; WZ.step = 'found'; renderWizard(); }).catch(e => { w.insertAdjacentHTML('beforeend', `<p class="c-bad">${esc(e.message)}</p>`); });
+    return;
+  }
+  if (WZ.step === 'found') {
+    const d = WZ.det, want = su.isps.find(i => i.id === WZ.isp), lbl = { freebox: 'Freebox', livebox: 'Livebox', bbox: 'Bbox', sfr: 'SFR Box', generic: 'box' }[d.box];
+    let head, txt;
+    if (d.box === 'generic' && WZ.isp !== 'other') { head = 'Box non reconnue'; txt = `Sonde n'a pas trouvé de ${esc(want.label)} compatible à ${esc(d.host || '—')}. Tu peux continuer en mode générique : ping, débit, charge et rapports marchent, mais sans la liste détaillée des appareils, le signal ni le blocage. Tu peux aussi donner l'adresse de ta box.`; }
+    else if (d.box === 'generic') { head = 'Mode générique'; txt = 'Sonde utilisera seulement les mesures faites depuis cet ordinateur et les appareils qu\'il voit sur le réseau.'; }
+    else if (!d.expected) { head = `${esc(d.model || lbl)} trouvée`; txt = `Tu as choisi ${esc(want.label)}, mais la box de ce réseau est une <b>${esc(d.model || lbl)}</b> (${esc(d.host)}). Sonde va utiliser celle-ci.`; }
+    else { head = `${esc(d.model || lbl)} trouvée`; txt = `Adresse : ${esc(d.host)}.`; }
+    w.innerHTML = `${stepsBar(1)}<h1>${head}</h1><p>${txt}</p>
+      ${d.box === 'generic' ? `<div class="fld"><label for="wzHost">Adresse de la box (facultatif)</label><input id="wzHost" placeholder="192.168.1.1" inputmode="decimal" autocomplete="off"></div>` : ''}
+      <div class="setrow"><button class="btn primary" id="wzOk">Continuer</button>${d.box === 'generic' ? '<button class="btn" id="wzRetry">Chercher à cette adresse</button>' : ''}<button class="btn ghost" id="wzBack">Changer d'opérateur</button></div>`;
+    $('#wzBack').onclick = () => { WZ.step = 'isp'; renderWizard(); };
+    if ($('#wzRetry')) $('#wzRetry').onclick = async () => { const h = $('#wzHost').value.trim(); if (!/^\d{1,3}(\.\d{1,3}){3}$/.test(h)) return toast('Adresse attendue, par exemple 192.168.1.1', true); WZ.det = await api('/api/setup/detect', { isp: WZ.isp, host: h }); renderWizard(); };
+    $('#wzOk').onclick = async () => {
+      const h = $('#wzHost')?.value.trim();
+      try { await api('/api/setup/save', { isp: WZ.isp, box: d.box, host: (d.box === 'generic' && /^\d{1,3}(\.\d{1,3}){3}$/.test(h || '') ? h : d.host) || su.gateway || '192.168.1.1', base: d.base, api: d.api, model: d.model, label: want?.label }); }
+      catch (e) { return toast(e.message, true); }
+      WZ.setup = await api('/api/setup'); WZ.step = 'auth'; renderWizard();
+    };
+    return;
+  }
+  if (WZ.step === 'auth') {
+    const a = su.auth || {}, lbl = su.label || 'box';
+    if (a.ok || a.kind === 'none') return wizardDone();
+    if (a.kind === 'button') {
+      w.innerHTML = `${stepsBar(2)}<h1>Autoriser Sonde sur la ${esc(lbl)}</h1><p>Clique sur le bouton puis valide avec la flèche droite sur l'écran de la box, dans les 90 secondes. Sonde reçoit un jeton gardé dans le coffre de cet ordinateur (trousseau d'accès de macOS, chiffrement Windows).</p>
+        <div class="setrow"><button class="btn primary" id="bAuth">Demander l'autorisation</button><button class="btn ghost" id="wzBack">Changer d'opérateur</button></div><p id="authSt" class="mono" style="font-size:var(--t-sm)"></p>`;
+      $('#bAuth').onclick = async () => { $('#bAuth').disabled = true; $('#authSt').textContent = 'Regarde l\'écran de la box et valide…'; try { await api('/api/setup/auth', {}); } catch (e) { $('#authSt').textContent = e.message; $('#bAuth').disabled = false; } };
+    } else {
+      w.innerHTML = `${stepsBar(2)}<h1>Connexion à la ${esc(lbl)}</h1><p>Entre les identifiants de la page d'administration de ta box (souvent écrits sous la box, ou ceux que tu as choisis). Ils restent sur cet ordinateur, dans son coffre (trousseau d'accès de macOS, chiffrement Windows), et ne servent qu'à lire la box.</p>
+        ${a.user ? `<div class="fld"><label for="wzUser">Identifiant</label><input id="wzUser" value="admin" autocomplete="username"></div>` : ''}
+        <div class="fld"><label for="wzPass">Mot de passe</label><input id="wzPass" type="password" autocomplete="current-password"></div>
+        <div class="setrow"><button class="btn primary" id="wzLogin">Se connecter</button><button class="btn ghost" id="wzBack">Changer d'opérateur</button></div><p id="authSt" class="mono" style="font-size:var(--t-sm)"></p>`;
+      const go = async () => { const b = $('#wzLogin'); b.disabled = true; $('#authSt').textContent = 'Connexion…'; try { await api('/api/setup/auth', { user: $('#wzUser')?.value.trim() || undefined, password: $('#wzPass').value }); $('#wzPass').value = ''; wizardDone(); } catch (e) { $('#authSt').textContent = e.message; b.disabled = false; } };
+      $('#wzLogin').onclick = go; $('#wzPass').onkeydown = e => { if (e.key === 'Enter') go(); };
+      setTimeout(() => $('#wzPass')?.focus(), 50);
+    }
+    $('#wzBack').onclick = async () => { await api('/api/setup/reset', {}).catch(() => { }); WZ.setup = await api('/api/setup'); WZ.step = 'isp'; renderWizard(); };
+  }
+}
+async function wizardDone() { $('#wiz').innerHTML = `${stepsBar(2)}<h1>C'est prêt</h1><p>Chargement des appareils…</p>`; await applyFeatures(); setTimeout(() => { $('nav.tabs').style.display = ''; show('live'); loadOverview(); }, 700); }
+function onAuth(a) {
+  const t = { granted: 'Autorisé. Chargement…', denied: 'Refusé sur la box.', timeout: 'Délai dépassé, recommence.', pending: 'En attente de validation sur la box…' };
+  if ($('#authSt')) $('#authSt').textContent = t[a.status] || a.status;
+  if (a.status === 'granted') wizardDone(); else if (a.status !== 'pending' && $('#bAuth')) $('#bAuth').disabled = false;
+}
+// Ce que la box permet : on masque ce qui n'a pas de sens (signal, trafic par appareil, blocage…)
+let FEAT = null, OSN = 'Mac';
+async function applyFeatures() {
+  const su = await api('/api/setup').catch(() => null); if (!su) return;
+  FEAT = su.features || {}; OSN = su.osLabel || 'Mac';
+  const b = document.body;
+  for (const [cls, on] of [['no-signal', !FEAT.signal], ['no-rate', !FEAT.perDeviceRate], ['no-block', !FEAT.block], ['no-rename', !FEAT.rename], ['no-nq', !su.hasNQ], ['no-repeater', !FEAT.repeater], ['no-ports', !FEAT.ports], ['no-wanrate', !FEAT.wanRate]]) b.classList.toggle(cls, !!on);
+  if (OSN !== 'Mac') relabel(document.body);
+}
+// Sur Windows, « Mac » devient « PC » partout dans l'interface (textes fixes et textes générés)
+function relabel(root) {
+  const re = /\bMac\b/g, w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let n; (n = w.nextNode());) if (re.test(n.nodeValue)) n.nodeValue = n.nodeValue.replace(re, OSN);
+  if (!relabel.obs) { relabel.obs = new MutationObserver(ms => { for (const m of ms) for (const n of m.addedNodes) { if (n.nodeType === 3) { if (/\bMac\b/.test(n.nodeValue)) n.nodeValue = n.nodeValue.replace(/\bMac\b/g, OSN); } else if (n.nodeType === 1) relabel(n); } }); relabel.obs.observe(document.body, { childList: true, subtree: true }); }
+}
+/* ============ réglages : box et mises à jour ============ */
+async function openSettings() {
+  const su = await api('/api/setup').catch(() => null); if (!su) return;
+  show('set');
+  const c = su.config || {}, f = su.features || {};
+  $('#setBoxSub').textContent = (su.isps.find(i => i.id === c.isp) || {}).label || '';
+  $('#setBox').innerHTML = kv([['Box', c.model || su.label], ['Adresse', c.host], ['Connexion', su.auth?.ok ? 'autorisée' : 'à faire'], ['Ordinateur', su.osLabel + ' · Sonde ' + su.version]]);
+  const L = { signal: 'signal Wi‑Fi', perDeviceRate: 'trafic par appareil', wanRate: 'débit de la fibre', rename: 'renommer', block: 'bloquer un appareil', repeater: 'répéteur', ports: 'ports' };
+  $('#setFeat').innerHTML = Object.entries(L).map(([k, l]) => `<span class="chip ${f[k] ? 'ok' : ''}">${f[k] ? '' : 'pas de '}${l}</span>`).join('') + (f.experimental ? '<span class="chip warn">prise en charge expérimentale</span>' : '');
+  loadUpdate();
+}
+async function loadUpdate() {
+  const u = await api('/api/update').catch(() => null); if (!u) return;
+  $('#updAuto').checked = !!u.auto;
+  $('#updSub').textContent = 'version ' + u.current;
+  const T = { idle: 'Pas encore vérifié.', checking: 'Vérification…', uptodate: 'Sonde est à jour.', available: `Version ${u.latest?.version} disponible.`, downloading: 'Téléchargement et vérification de la signature…', restarting: 'Installée, redémarrage…', error: 'Erreur : ' + (u.error || '') };
+  $('#updTxt').textContent = (T[u.state] || u.state) + (!u.installed ? ' (version de développement : installation automatique désactivée)' : '');
+  $('#updApply').style.display = u.state === 'available' && u.installed ? '' : 'none';
+  const chip = $('#updChip'); if (u.state === 'available') { chip.textContent = 'Mise à jour ' + u.latest.version; chip.style.display = ''; } else chip.style.display = 'none';
+}
+$('#bSet').onclick = openSettings; $('#updChip').onclick = openSettings;
+$('#setBack').onclick = () => { $('nav.tabs').style.display = ''; show('live'); };
+$('#setChange').onclick = async () => { if (!(await ask('Changer de box ?', 'Sonde va oublier la connexion à la box actuelle et relancer l\'assistant. Tes rapports et ton historique sont gardés.', 'Changer'))) return; await api('/api/setup/reset', {}); WZ.isp = null; openWizard('isp'); };
+$('#updAuto').onchange = e => api('/api/update/auto', { auto: e.target.checked }).then(loadUpdate);
+$('#updCheck').onclick = async () => { $('#updTxt').textContent = 'Vérification…'; await api('/api/update/check', {}).catch(e => toast(e.message, true)); loadUpdate(); };
+$('#updApply').onclick = async () => { $('#updTxt').textContent = 'Téléchargement et vérification de la signature…'; const r = await api('/api/update/apply', {}).catch(e => ({ ok: false, error: e.message })); if (!r.ok) return toast(r.error, true); $('#updTxt').textContent = `Version ${r.version} installée, redémarrage…`; setTimeout(() => location.reload(), 5000); };
+
+/* ============ flux temps réel ============ */
+function connect() {
+  const es = new EventSource('/api/stream');
+  const live = $('#pLive');
+  es.onopen = () => { live.innerHTML = '<span class="dot live"></span>En direct'; };
+  es.onerror = () => { live.innerHTML = '<span class="dot bad"></span>Moteur arrêté'; };
+  const on = (n, f) => es.addEventListener(n, e => { try { f(JSON.parse(e.data)); } catch (err) { console.error(n, err); } });
+  on('wan', onWan);
+  on('mac', m => { S.mac = m; if (m.ok) $('#kvMac').innerHTML = kv([['Bande', bandTxt(m.band)], ['Canal', m.channel], ['Signal', m.signal != null ? `<span class="sig ${sigCls(m.signal)}">${m.signal} dBm</span>` : null, true], ['Bruit', m.noise != null ? m.noise + ' dBm' : null], ['Lien', m.rate ? m.rate + ' Mb/s' : null]]); });
+  on('wanHist', h => h.forEach(w => { cWan.push('d', w.t, w.down); cWan.push('u', w.t, w.up); }));
+  on('devices', d => { const first = !S.devices.length; S.devices = d; renderRack(); if (first) loadOverview(); });
+  on('macscan', m => { const el = $('#scanWarn'); if (m.n >= 2) { const who = m.procs.map(x => `${x.name} ×${x.n}`).join(', '); el.innerHTML = `<b>Le Mac cherche des réseaux Wi‑Fi en ce moment</b> (${esc(who)} en 30 s). Chaque recherche fait décrocher sa carte Wi‑Fi une seconde et fausse les mesures et les speed tests.${m.procs.some(x => /Réglages/.test(x.name)) ? ' Ferme la page Wi‑Fi des Réglages Système.' : ''}`; el.style.display = ''; } else el.style.display = 'none'; });
+  on('newdev', e => toast(e.renamed ? `Nouvel appareil détecté et nommé : ${e.renamed}` : `Nouvel appareil détecté : ${e.device}`));
+  on('wping', onWping); on('wevent', e => { EV.unshift(e); renderEvents(); }); on('scan', onScan); on('ping', onPing); on('load', onLoad); on('loadEnd', onLoadEnd); on('full', onFull); on('fullEnd', onFullEnd); on('auth', onAuth);
+  on('wanError', e => { if (/no_token|invalid_token|auth_failed/.test(e.code || '')) loadOverview(); });
+  on('update', () => loadUpdate()); on('updated', u => { toast(`Sonde a été mise à jour (version ${u.version}). Redémarrage…`); setTimeout(() => location.reload(), 6000); });
+}
+$('#bQuit').onclick = async () => { await api('/api/quit', {}).catch(() => { }); document.body.innerHTML = '<div class="empty" style="padding-top:30vh">Sonde est fermée. Tu peux fermer cette fenêtre.</div>'; setTimeout(() => window.close(), 400); };
+
+{ const t = location.hash.slice(1) || store.get('tab', 'live'); show(['live', 'devs', 'svc', 'scan', 'ping', 'load', 'full', 'cmp', 'hist'].includes(t) ? t : 'live'); }
+applyFeatures().then(loadUpdate); loadNote(); loadOverview(); connect(); loop(); setTimeout(loadWatch, 4000); setInterval(() => { if (!cCons.series.size || cCons.series.size < 3) loadWatch(); }, 5000);
+setInterval(loadOverview, 4000);
+// fraîcheur des données affichée dans l'en-tête
+setInterval(() => { if (!S.lastWan) return; const a = (Date.now() - S.lastWan) / 1000; const p = $('#pLive'); if (a > 4) p.innerHTML = `<span class="dot" style="background:var(--warn)"></span>Données figées depuis ${Math.round(a)} s`; else p.innerHTML = '<span class="dot live"></span>En direct · ping 4/s · box 1/s'; }, 500);
+</script>
+</body>
+</html>
