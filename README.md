@@ -1,4 +1,4 @@
-# Pouls
+# Rebond
 
 <img src="assets/icon.svg" width="96" alt="">
 
@@ -9,6 +9,17 @@
 *Home network test bench for macOS and Windows (French UI). Works with Freebox, Livebox, SFR Box and Bbox. Zero dependencies, local only, signed auto-updates.*
 
 ## Installation
+
+### Télécharger l'app
+
+Dans la [dernière release](https://github.com/Nesaris/sonde/releases/latest) :
+
+- **Mac** (macOS 11 ou plus récent, Apple Silicon et Intel) : `Rebond-mac.zip`. Décompresse, glisse **Rebond** dans Applications et ouvre-la. L'app n'est pas signée par un compte développeur Apple : la première fois, fais clic droit → **Ouvrir** (ou Réglages Système → Confidentialité et sécurité → **Ouvrir quand même**).
+- **Windows 10 / 11** : `Rebond.exe`. Windows SmartScreen peut afficher « Windows a protégé votre ordinateur » : **Informations complémentaires → Exécuter quand même**.
+
+Au premier lancement, l'app installe son moteur toute seule (Node.js vérifié par empreinte SHA-256, moteur vérifié par signature Ed25519). Rebond est une vraie app avec sa propre fenêtre : elle n'utilise aucun navigateur, seulement le moteur web intégré au système (WebKit sur Mac, WebView2 sur Windows).
+
+### Ou en une ligne de commande
 
 **Mac** (macOS 11 ou plus récent) — dans le Terminal :
 
@@ -22,7 +33,7 @@ curl -fsSL https://raw.githubusercontent.com/Nesaris/sonde/main/install/mac.sh |
 irm https://raw.githubusercontent.com/Nesaris/sonde/main/install/win.ps1 | iex
 ```
 
-Au premier lancement, Pouls demande ton opérateur, trouve ta box toute seule et te connecte :
+Au premier lancement, Rebond cherche ta box tout seul, te demande si c'est bien elle, puis s'y connecte :
 
 | Opérateur | Box | Connexion | Prise en charge |
 |---|---|---|---|
@@ -51,7 +62,7 @@ Le ping, les tests de débit, la surveillance des pics et les rapports marchent 
 
 L'onglet **Services** montre en direct chaque site ou service consulté (Netflix, YouTube, jeux…) avec son logo, qui l'utilise, et permet de bloquer un site ou un service, de recevoir des alertes Discord ou Telegram, et de donner la priorité à un appareil. Il faut pour ça un petit serveur DNS local, l'agent. Trois façons de l'installer :
 
-- **Sur l'ordinateur** : bouton « Activer sur cet ordinateur » dans l'onglet Services. Actif seulement quand Pouls est ouvert. Sur chaque appareil à surveiller : DNS 1 = l'ordinateur, DNS 2 = la box.
+- **Sur l'ordinateur** : bouton « Activer sur cet ordinateur » dans l'onglet Services. Actif seulement quand Rebond est ouvert. Sur chaque appareil à surveiller : DNS 1 = l'ordinateur, DNS 2 = la box.
 - **Docker** (NAS, serveur, Raspberry Pi) :
   ```bash
   curl -fsSL https://raw.githubusercontent.com/Nesaris/sonde/main/agent/install.sh | sudo bash -s -- --docker
@@ -65,18 +76,18 @@ L'agent ne lit que les **noms de domaine** demandés (pas les pages ni le conten
 
 ## Sécurité et vie privée
 
-- **Tout reste chez toi.** Pouls écoute seulement sur `127.0.0.1` ; l'agent répond seulement au réseau local. Aucune télémétrie.
+- **Tout reste chez toi.** Rebond écoute seulement sur `127.0.0.1` ; l'agent répond seulement au réseau local. Aucune télémétrie.
 - **Mots de passe de box** gardés dans le coffre du système : trousseau d'accès sur Mac, chiffrement DPAPI du compte sur Windows.
 - **Agent** : API HTTPS en TLS 1.3 (certificat épinglé, empreinte affichée), compte créé avec un code d'installation à usage unique, mots de passe hachés (scrypt), blocage après 5 essais ratés, sessions révocables.
 - **Interface** : accessible seulement à la fenêtre ouverte par l'icône (clé d'accès locale), politique de sécurité du contenu stricte, aucune ressource chargée depuis Internet (polices et pictogrammes inclus).
-- **Mises à jour signées** : chaque version est signée (Ed25519) par le mainteneur. Pouls, les installeurs et l'agent vérifient la signature avant d'installer quoi que ce soit ; une version modifiée par quelqu'un d'autre est refusée. Node.js est téléchargé depuis nodejs.org et son empreinte SHA-256 est vérifiée.
-- **Retour arrière automatique** : si une nouvelle version plante au démarrage, Pouls revient à la précédente.
+- **Mises à jour signées** : chaque version est signée (Ed25519) par le mainteneur. Rebond, les installeurs et l'agent vérifient la signature avant d'installer quoi que ce soit ; une version modifiée par quelqu'un d'autre est refusée. Node.js est téléchargé depuis nodejs.org et son empreinte SHA-256 est vérifiée.
+- **Retour arrière automatique** : si une nouvelle version plante au démarrage, Rebond revient à la précédente.
 
 Détails et signalement d'une faille : [SECURITY.md](SECURITY.md).
 
 ## Mises à jour
 
-Pouls vérifie les nouvelles versions au démarrage puis toutes les 6 heures, et les installe toute seule quand aucun test n'est en cours (désactivable dans Réglages → Mises à jour). L'agent installé par script se met à jour chaque jour (minuteur systemd ou reconstruction Docker).
+Rebond vérifie les nouvelles versions au démarrage puis toutes les 6 heures, et les installe toute seule quand aucun test n'est en cours (désactivable dans Réglages → Mises à jour). L'agent installé par script se met à jour chaque jour (minuteur systemd ou reconstruction Docker).
 
 ## Désinstaller
 
@@ -92,7 +103,7 @@ Aucune dépendance : Node.js 18 ou plus récent suffit.
 node app/server.js          # puis http://127.0.0.1:47800
 ```
 
-Structure : `app/` (moteur + interface), `app/lib/boxes/` (une couche par box), `app/lib/platform.js` (ping, Wi‑Fi, coffre à secrets selon le système), `agent/` (DNS local), `install/` (installeurs), `tools/` (signature et publication).
+Structure : `app/` (moteur + interface), `native-src/` (fenêtres natives Mac en Swift et Windows en Go, construites par `tools/build-native.sh`), `app/lib/boxes/` (une couche par box), `app/lib/platform.js` (ping, Wi‑Fi, coffre à secrets selon le système), `agent/` (DNS local), `install/` (installeurs), `tools/` (signature et publication).
 
 Publier une version (mainteneur) : `node tools/keygen.mjs` une seule fois, puis `node tools/release.mjs 1.0.1 "notes"`.
 

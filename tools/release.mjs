@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Publie une version signée de Sonde sur GitHub.
+// Publie une version signée de Rebond (anciennement Sonde) sur GitHub.
 //   node tools/release.mjs 1.0.1 "Ce qui change"
 // 1. inscrit la version dans app/version.json et agent/version.json
 // 2. construit le paquet de l'app (JSON) et l'archive de l'agent (tar.gz)
@@ -43,11 +43,18 @@ for (const f of ['install.sh', 'docker-entrypoint.sh']) fs.chmodSync(path.join(S
 sh('tar', ['-czf', agentFile, '-C', STAGE, '.'], { env: { ...process.env, COPYFILE_DISABLE: '1' } });
 fs.rmSync(STAGE, { recursive: true, force: true });
 
+// ---- apps natives (Rebond.app, Rebond.exe) : construites sur Mac
+const natives = [];
+if (process.platform === 'darwin' && !process.env.SONDE_NO_NATIVE) {
+  execFileSync('bash', [path.join(ROOT, 'tools/build-native.sh'), ver, OUT], { cwd: ROOT, stdio: 'inherit' });
+  natives.push(path.join(OUT, 'Rebond-mac.zip'), path.join(OUT, 'Rebond.exe'));
+}
+
 // ---- signatures + vérification avec la clé publique du code
 const pubB64 = (fs.readFileSync(path.join(ROOT, 'app/lib/updater.js'), 'utf8').match(/MCowBQYDK2VwAyEA[A-Za-z0-9+/=]{44}/) || [])[0];
 if (!pubB64) { console.error('Clé publique absente du code : lance  node tools/keygen.mjs'); process.exit(1); }
 const pub = crypto.createPublicKey(`-----BEGIN PUBLIC KEY-----\n${pubB64}\n-----END PUBLIC KEY-----`);
-for (const f of [appFile, agentFile]) {
+for (const f of [appFile, agentFile, ...natives]) {
   const buf = fs.readFileSync(f), sig = crypto.sign(null, buf, priv);
   if (!crypto.verify(null, buf, pub, sig)) { console.error('La clé privée ne correspond pas à la clé publique du code.'); process.exit(1); }
   fs.writeFileSync(f + '.sig', sig.toString('base64') + '\n');
@@ -57,8 +64,8 @@ console.log('Paquets signés dans dist/ :', fs.readdirSync(OUT).join(', '));
 // ---- git + release GitHub
 if (process.env.SONDE_DRY) process.exit(0);
 sh('git', ['add', '-A']);
-try { sh('git', ['commit', '-m', `Sonde ${ver}${notes ? '\n\n' + notes : ''}${process.env.SONDE_TRAILER ? '\n\n' + process.env.SONDE_TRAILER : ''}`]); } catch { }
-sh('git', ['tag', '-a', 'v' + ver, '-m', 'Sonde ' + ver]);
+try { sh('git', ['commit', '-m', `Rebond ${ver}${notes ? '\n\n' + notes : ''}${process.env.SONDE_TRAILER ? '\n\n' + process.env.SONDE_TRAILER : ''}`]); } catch { }
+sh('git', ['tag', '-a', 'v' + ver, '-m', 'Rebond ' + ver]);
 sh('git', ['push', '--follow-tags']);
-sh('gh', ['release', 'create', 'v' + ver, '--title', 'Sonde ' + ver, '--notes', notes || 'Nouvelle version de Sonde.', appFile, appFile + '.sig', agentFile, agentFile + '.sig']);
+sh('gh', ['release', 'create', 'v' + ver, '--title', 'Rebond ' + ver, '--notes', notes || 'Nouvelle version de Rebond.', ...natives, ...natives.map(f => f + '.sig'), appFile, appFile + '.sig', agentFile, agentFile + '.sig']);
 console.log('Release publiée : v' + ver);
