@@ -2071,8 +2071,11 @@ $('#updCheck').onclick = async () => { $('#updTxt').textContent = 'Vérification
 $('#updApply').onclick = async () => { $('#updTxt').textContent = 'Téléchargement et vérification de la signature…'; const r = await api('/api/update/apply', {}).catch(e => ({ ok: false, error: e.message })); if (!r.ok) return toast(r.error, true); $('#updTxt').textContent = `Version ${r.version} installée, redémarrage…`; setTimeout(() => location.reload(), 5000); };
 
 /* ============ flux temps réel ============ */
+let ES = null, esAt = 0;
+// Si plus aucune donnée n'arrive pendant 10 s alors que le flux semble ouvert (serveur redémarré…), on se reconnecte
+setInterval(() => { if (ES && S.lastWan && Date.now() - S.lastWan > 10000 && Date.now() - esAt > 10000) { try { ES.close(); } catch { } connect(); } }, 2000);
 function connect() {
-  const es = new EventSource('/api/stream');
+  const es = new EventSource('/api/stream'); ES = es; esAt = Date.now();
   const live = $('#pLive');
   es.onopen = () => { live.innerHTML = '<span class="dot live"></span>En direct'; };
   es.onerror = () => { live.innerHTML = '<span class="dot bad"></span>Moteur arrêté'; };

@@ -710,7 +710,13 @@ function proxyToAgent(req, res, p, search) {
     const fp = seenFp || ur.socket.getPeerCertificate()?.fingerprint256;
     if (c.fp && fp !== c.fp) { ur.resume(); return send(res, 495, { error: 'Certificat de l\'agent différent de celui mémorisé : connexion refusée.' }); }
     if (ur.statusCode === 401) { ur.resume(); const { token, ...rest } = c; saveAgent(rest); return send(res, 401, { error: 'Connexion au serveur NetBench requise', needAgentLogin: true, agent: c.url, user: c.user || null }); }
-    if (sse) { proxied++; lastClientSeen = now(); res.on('close', () => { proxied--; lastClientSeen = now(); up.destroy(); }); }
+    if (sse) {
+      // flux en direct : si l'agent ne dit plus rien pendant 35 s (redémarrage, réseau coupé), on coupe pour que la fenêtre se reconnecte
+      let last = Date.now(); ur.on('data', () => { last = Date.now(); });
+      const wd = setInterval(() => { if (Date.now() - last > 35000) { up.destroy(); try { res.end(); } catch { } } }, 5000);
+      proxied++; lastClientSeen = now(); res.on('close', () => { clearInterval(wd); proxied--; lastClientSeen = now(); up.destroy(); });
+      ur.on('end', () => { try { res.end(); } catch { } });
+    }
     res.writeHead(ur.statusCode, { ...SEC_HEADERS, 'content-type': ur.headers['content-type'] || 'application/json', 'cache-control': 'no-store', ...(/^\/api\/logo/.test(p) ? { 'content-security-policy': "default-src 'none'" } : {}), ...(sse ? { connection: 'keep-alive' } : {}) });
     ur.pipe(res);
   });
