@@ -339,12 +339,13 @@ function flushJournal() {
   for (const [d, ls] of Object.entries(by)) fs.appendFile(path.join(JOUR_DIR, d + '.jsonl'), ls.join('\n') + '\n', () => { });
 }
 setInterval(flushJournal, 10000);
-function pruneJournal() {
+async function pruneJournal() {
   try {
-    const fl = fs.readdirSync(JOUR_DIR).filter(f => /^\d{4}-\d\d-\d\d\.jsonl$/.test(f)).sort().map(f => ({ f, size: fs.statSync(path.join(JOUR_DIR, f)).size }));
+    const names = (await fs.promises.readdir(JOUR_DIR)).filter(f => /^\d{4}-\d\d-\d\d\.jsonl$/.test(f)).sort();
+    const fl = await Promise.all(names.map(async f => ({ f, size: (await fs.promises.stat(path.join(JOUR_DIR, f))).size })));
     let tot = fl.reduce((a, x) => a + x.size, 0);
     const old = new Date(now() - 90 * 86400e3).toISOString().slice(0, 10);
-    for (const x of fl.slice(0, -1)) { if (tot <= JOURNAL_MAX && x.f.slice(0, 10) >= old) break; fs.rmSync(path.join(JOUR_DIR, x.f), { force: true }); tot -= x.size; }
+    for (const x of fl.slice(0, -1)) { if (tot <= JOURNAL_MAX && x.f.slice(0, 10) >= old) break; await fs.promises.rm(path.join(JOUR_DIR, x.f), { force: true }); tot -= x.size; }
   } catch { }
 }
 setInterval(pruneJournal, 3600e3); setTimeout(pruneJournal, 60e3);
@@ -355,7 +356,8 @@ async function liveHistory(rangeS) {
   if (!rows.length || rows[0].t > since + 60e3) {
     const days = new Set(); for (let t = since; t <= now() + 86400e3; t += 86400e3) days.add(new Date(t).toISOString().slice(0, 10));
     const fromFiles = [];
-    for (const d of [...days].sort()) { try { for (const l of fs.readFileSync(path.join(JOUR_DIR, d + '.jsonl'), 'utf8').split('\n')) { if (!l) continue; try { const r = JSON.parse(l); if (r.t >= since) fromFiles.push(r); } catch { } } } catch { } }
+    // lecture asynchrone : un disque lent ne doit jamais bloquer les mesures en cours
+    for (const d of [...days].sort()) { try { for (const l of (await fs.promises.readFile(path.join(JOUR_DIR, d + '.jsonl'), 'utf8')).split('\n')) { if (!l) continue; try { const r = JSON.parse(l); if (r.t >= since) fromFiles.push(r); } catch { } } } catch { } }
     const first = rows.length ? rows[0].t : Infinity;
     rows = fromFiles.filter(r => r.t < first).concat(rows);
   }

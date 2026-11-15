@@ -34,7 +34,21 @@ let IS_FBX = null;
 const now = () => Date.now();
 const log = (...a) => console.log(new Date().toISOString(), ...a);
 const readJSON = (f, d) => { try { return JSON.parse(fs.readFileSync(F(f), 'utf8')); } catch { return d; } };
-const writeJSON = (f, v) => { const t = F(f + '.tmp'); fs.writeFileSync(t, JSON.stringify(v), { mode: 0o600 }); fs.renameSync(t, F(f)); };
+// Écritures disque jamais bloquantes : sur un disque lent (clé USB), une écriture synchrone gèlerait le DNS
+// de toute la maison. Chaque fichier est écrit en arrière-plan, de façon atomique, et les écritures rapprochées
+// sont regroupées.
+const writeQ = new Map();
+function writeJSON(f, v) {
+  const q = writeQ.get(f); if (q) { q.v = v; q.dirty = true; return; }
+  const job = { v, dirty: false }; writeQ.set(f, job);
+  (async function run() {
+    const t = F(f + '.tmp');
+    try { await fs.promises.writeFile(t, JSON.stringify(job.v), { mode: 0o600 }); await fs.promises.rename(t, F(f)); } catch (e) { log('écriture', f, ':', e.message); }
+    if (job.dirty) { job.dirty = false; return run(); }
+    writeQ.delete(f);
+  })();
+}
+const writeJSONNow = (f, v) => { const t = F(f + '.tmp'); fs.writeFileSync(t, JSON.stringify(v), { mode: 0o600 }); fs.renameSync(t, F(f)); }; // compte (rare)
 
 // =================================================================== DNS
 // Chaque requête est transmise telle quelle au DNS de la box (puis 1.1.1.1 en secours).
@@ -216,23 +230,29 @@ function logLine(kind, obj) {
   if (!w || w.file !== f) { if (w) w.stream.end(); w = writers[kind] = { file: f, stream: fs.createWriteStream(f, { flags: 'a', mode: 0o600 }) }; }
   w.stream.write(JSON.stringify(obj) + '\n');
 }
-function diskFree() { try { const s = fs.statfsSync(DATA); return s.bavail * s.bsize; } catch { return Infinity; } }
-function logFiles() { return fs.readdirSync(LOGS).filter(f => f.endsWith('.jsonl')).sort().map(f => ({ f, size: fs.statSync(path.join(LOGS, f)).size })); }
-function retention() {
-  let files = logFiles(), total = files.reduce((a, x) => a + x.size, 0), freed = 0;
+let diskCache = { free: Infinity, total: null, files: [] };
+const diskFree = () => diskCache.free;
+const logFiles = () => diskCache.files;
+async function refreshDisk() {
+  try { const s = await fs.promises.statfs(DATA); diskCache.free = s.bavail * s.bsize; diskCache.total = s.blocks * s.bsize; } catch { }
+  try { const names = (await fs.promises.readdir(LOGS)).filter(f => f.endsWith('.jsonl')).sort(); diskCache.files = await Promise.all(names.map(async f => ({ f, size: (await fs.promises.stat(path.join(LOGS, f))).size }))); } catch { }
+}
+async function retention() {
+  await refreshDisk();
+  let files = [...diskCache.files], total = files.reduce((a, x) => a + x.size, 0), freed = 0;
   const today = day(now());
-  while (files.length && (diskFree() + freed < MIN_FREE || (MAX_LOGS && total > MAX_LOGS))) {
+  while (files.length && (diskCache.free + freed < MIN_FREE || (MAX_LOGS && total > MAX_LOGS))) {
     const x = files.shift(); if (x.f.startsWith(today)) break; // on ne supprime jamais la journée en cours
-    try { fs.unlinkSync(path.join(LOGS, x.f)); freed += x.size; total -= x.size; log('rétention : supprimé', x.f); } catch { }
+    try { await fs.promises.unlink(path.join(LOGS, x.f)); freed += x.size; total -= x.size; log('rétention : supprimé', x.f); } catch { }
   }
   // les agrégats horaires sont minuscules : on les garde 1 an, et on raccourcit seulement si le disque est vraiment plein
-  if (diskFree() < MIN_FREE / 2) stats.keepHours = Math.max(24 * 7, Math.floor(stats.keepHours / 2));
+  if (diskCache.free < MIN_FREE / 2) stats.keepHours = Math.max(24 * 7, Math.floor(stats.keepHours / 2));
+  await refreshDisk();
 }
 setInterval(retention, 10 * 60e3); setTimeout(retention, 5000);
 function storage() {
   const files = logFiles();
-  let s = {}; try { s = fs.statfsSync(DATA); } catch { }
-  return { free: diskFree(), total: s.blocks ? s.blocks * s.bsize : null, logs: files.reduce((a, x) => a + x.size, 0), oldest: files[0]?.f.slice(0, 10) || null, days: new Set(files.map(x => x.f.slice(0, 10))).size, keepHours: stats.keepHours, minFree: MIN_FREE };
+  return { free: diskFree(), total: diskCache.total, logs: files.reduce((a, x) => a + x.size, 0), oldest: files[0]?.f.slice(0, 10) || null, days: new Set(files.map(x => x.f.slice(0, 10))).size, keepHours: stats.keepHours, minFree: MIN_FREE };
 }
 
 // =================================================================== statistiques (heure par heure)
@@ -475,7 +495,7 @@ const apiHandler = async (req, res) => {
       if (!/^[\w.@-]{3,32}$/.test(b.user || '')) return send(res, 400, { error: 'Identifiant : 3 à 32 caractères (lettres, chiffres, . _ - @).' });
       if (String(b.pass || '').length < 12 || String(b.pass) === b.user) return send(res, 400, { error: 'Mot de passe : 12 caractères minimum, différent de l\'identifiant.' });
       const salt = crypto.randomBytes(16).toString('hex');
-      writeJSON('users.json', { user: b.user, salt, hash: scrypt(b.pass, salt), created: new Date().toISOString() });
+      writeJSONNow('users.json', { user: b.user, salt, hash: scrypt(b.pass, salt), created: new Date().toISOString() });
       fs.rmSync(F('setup-code'), { force: true });
       return send(res, 200, { ok: true });
     }
@@ -509,7 +529,7 @@ const apiHandler = async (req, res) => {
       const b = await body(req), u = users();
       if (!crypto.timingSafeEqual(Buffer.from(scrypt(String(b.old || ''), u.salt), 'hex'), Buffer.from(u.hash, 'hex'))) return send(res, 401, { error: 'Ancien mot de passe incorrect.' });
       if (String(b.pass || '').length < 12 || String(b.pass) === b.user) return send(res, 400, { error: 'Mot de passe : 12 caractères minimum, différent de l\'identifiant.' });
-      const salt = crypto.randomBytes(16).toString('hex'); writeJSON('users.json', { ...u, salt, hash: scrypt(b.pass, salt) });
+      const salt = crypto.randomBytes(16).toString('hex'); writeJSONNow('users.json', { ...u, salt, hash: scrypt(b.pass, salt) });
       sessions.clear(); saveSessions(); return send(res, 200, { ok: true });
     }
     if (p === '/api/services') return send(res, 200, { range: url.searchParams.get('range') || '24h', fbx: fbxState, services: services(url.searchParams.get('range')), since: Math.min(...Object.keys(stats.h).map(Number), Math.floor(now() / 3600e3)) * 3600e3 });
