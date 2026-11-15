@@ -247,8 +247,8 @@ table.dt tr.sel td:first-child{box-shadow:inset 2px 0 0 var(--accent)}
 .fr .dv{display:flex;align-items:center;gap:7px;min-width:0;color:var(--text-2)}
 .fr .dv span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fr .dv i{width:7px;height:7px;border-radius:50%;flex:none}
-.fr img.fav{width:20px;height:20px;border-radius:5px;background:#fff;display:block}
-.favw{position:relative;width:20px;height:20px;display:block}
+.fr img.fav,.favw img.fav{width:20px;height:20px;border-radius:5px;background:#fff;display:block;object-fit:contain}
+.favw{position:relative;width:20px;height:20px;display:block;flex:none;overflow:hidden;border-radius:5px}
 .favw b{display:none;position:absolute;inset:0;border-radius:5px;background:var(--bg);color:#fff;font:600 11px var(--sans);place-items:center}
 .favw.nofav img{display:none}.favw.nofav b{display:grid}
 .fr .dm{font-family:var(--mono);font-size:var(--t-xs);color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
