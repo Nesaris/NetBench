@@ -921,7 +921,7 @@ class Chart {
     const dpr = devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
     if (cv.width !== W * dpr || cv.height !== H * dpr) { cv.width = W * dpr; cv.height = H * dpr; }
     const g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
-    const L = 52, R = 10, T = 10, B = 22, w = W - L - R, h = H - T - B;
+    let L = 52, w; const R = 10, T = 10, B = 22, h = H - T - B;
     const tEnd = this.o.tEnd ? this.o.tEnd() : Date.now(), tStart = tEnd - this.o.win * 1000;
     let max = this.o.min;
     for (const s of this.series.values()) for (const [t, v] of s.pts) if (t >= tStart && v != null && v > max) max = v;
@@ -929,6 +929,9 @@ class Chart {
     if (this.o.ceiling && this.o.showCeiling && this.o.showCeiling()) max = Math.max(max, this.o.ceiling());
     const nice = n => { const p = 10 ** Math.floor(Math.log10(n)); const f = n / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p; };
     const step = nice(max / 4); max = Math.ceil(max * 1.04 / step) * step;
+    // marge gauche selon l'étiquette la plus large (« 1 000 ms » ne doit pas être coupé)
+    g.font = '11px "IBM Plex Mono", ui-monospace, monospace';
+    L = Math.max(52, Math.ceil(g.measureText(this.o.fmt(max)).width) + 16); w = W - L - R;
     const X = t => L + (t - tStart) / (tEnd - tStart) * w, Y = v => T + h - Math.min(v, max) / max * h;
     g.font = '11px "IBM Plex Mono", ui-monospace, monospace'; g.textBaseline = 'middle';
     g.strokeStyle = css('--line'); g.fillStyle = css('--text-3'); g.lineWidth = 1;
@@ -1072,7 +1075,7 @@ const cCons = new Chart($('#cCons'), { win: 120, fmt: v => nf0.format(v) + ' ms'
 charts.push(cCons);
 const W = { names: {}, last: {}, win: {} };
 function consSeries(targets) {
-  targets.forEach(t => { W.names[t.key] = t.name; if (cCons.series.has(t.key)) { cCons.series.get(t.key).label = t.name; return; } const n = [...cCons.series.keys()].filter(k => k !== 'ref' && k !== 'inet').length; cCons.set(t.key, t.name, t.key === 'ref' ? css('--text-3') : t.key === 'inet' ? css('--s7') : css(['--s1', '--s2', '--s3', '--s5', '--s6'][n % 5])); });
+  targets.forEach(t => { W.names[t.key] = t.name; const dv = S.devices.find(d => d.id === t.key); const lb = dv ? pretty(dv) : t.name; if (cCons.series.has(t.key)) { cCons.series.get(t.key).label = lb; return; } const n = [...cCons.series.keys()].filter(k => k !== 'ref' && k !== 'inet').length; cCons.set(t.key, lb, t.key === 'ref' ? css('--text-3') : t.key === 'inet' ? css('--s7') : css(['--s1', '--s2', '--s3', '--s5', '--s6'][n % 5])); });
   $('#consLegend').innerHTML = [...cCons.series].map(([k, s]) => `<span><i style="background:${s.color}"></i>${esc(s.label)}</span>`).join('');
 }
 function onWping(p) {
@@ -1086,7 +1089,7 @@ function onWping(p) {
 function renderPills() {
   const keys = [...cCons.series.keys()].sort((a, b) => (a === 'ref') - (b === 'ref') || (a === 'inet') - (b === 'inet'));
   $('#consPills').innerHTML = keys.map(k => {
-    const s = cCons.series.get(k), w = W.win[k] || [], ok = w.filter(x => x[1] != null).map(x => x[1]);
+    const s = cCons.series.get(k), dv = S.devices.find(d => d.id === k); if (dv) s.label = pretty(dv); const w = W.win[k] || [], ok = w.filter(x => x[1] != null).map(x => x[1]);
     const mx = ok.length ? Math.max(...ok) : null, lost = w.length - ok.length, v = W.last[k];
     return `<div class="cpill"><div class="n"><span class="sw" style="background:${s.color};margin:0"></span>${esc(s.label)}</div>
       <div class="v ${pingCls(v)}">${v == null ? (k in W.last ? '<span class="c-bad">perdu</span>' : '—') : nf1.format(v)}${v != null ? '<small>ms</small>' : ''}</div>
@@ -1123,6 +1126,9 @@ async function loadRange() {
     cWan.load('d', h.wan.map(x => [x[0], x[1]])); cWan.load('u', h.wan.map(x => [x[0], x[2]]));
     const byName = Object.fromEntries(Object.entries(W.names).map(([k, n]) => [n, k]));
     for (const [name, pts] of Object.entries(h.pings)) { const k = byName[name]; if (k) cCons.load(k, pts); }
+    // pas encore assez d'historique pour la période choisie : le graphique commence au début des mesures
+    const avail = h.oldest ? (Date.now() - h.oldest) / 1000 : RANGE;
+    if (RANGE > 600 && avail < RANGE * 0.9) { cWan.o.win = cCons.o.win = Math.max(600, Math.ceil(avail * 1.03)); cWan.dirty = cCons.dirty = true; }
     if (h.oldest && RANGE > 600 && h.oldest > Date.now() - RANGE * 1000 + 600e3) $('#liveSrc').textContent = `historique disponible depuis ${new Date(h.oldest).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}`;
     else liveSrcText();
   } catch { }
@@ -2245,7 +2251,11 @@ setInterval(() => { if (ES && S.lastWan && Date.now() - S.lastWan > 10000 && Dat
 function connect() {
   const es = new EventSource('/api/stream'); ES = es; esAt = Date.now();
   const live = $('#pLive');
-  es.onopen = () => { live.innerHTML = '<span class="dot live"></span>En direct'; };
+  es.onopen = () => {
+    live.innerHTML = '<span class="dot live"></span>En direct';
+    // l'app a été mise à jour pendant que la fenêtre était ouverte : on recharge pour afficher la nouvelle version
+    api('/api/update').then(u => { if (!u?.current) return; if (connect.ver && connect.ver !== u.current) location.reload(); connect.ver = u.current; }).catch(() => { });
+  };
   es.onerror = () => { live.innerHTML = '<span class="dot bad"></span>Moteur arrêté'; };
   const on = (n, f) => es.addEventListener(n, e => { try { f(JSON.parse(e.data)); } catch (err) { console.error(n, err); } });
   on('wan', onWan);
