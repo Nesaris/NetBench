@@ -1092,7 +1092,7 @@ function renderPills() {
     const s = cCons.series.get(k), dv = S.devices.find(d => d.id === k); if (dv) s.label = pretty(dv); const w = W.win[k] || [], ok = w.filter(x => x[1] != null).map(x => x[1]);
     const mx = ok.length ? Math.max(...ok) : null, lost = w.length - ok.length, v = W.last[k];
     return `<div class="cpill"><div class="n"><span class="sw" style="background:${s.color};margin:0"></span>${esc(s.label)}</div>
-      <div class="v ${pingCls(v)}">${v == null ? (k in W.last ? '<span class="c-bad">perdu</span>' : '—') : nf1.format(v)}${v != null ? '<small>ms</small>' : ''}</div>
+      ${W.sleep?.[k] ? '<span class="chip" style="float:right;margin-top:-18px">en veille</span>' : ''}<div class="v ${W.sleep?.[k] ? 'c-dim' : pingCls(v)}">${v == null ? (k in W.last ? '<span class="c-bad">perdu</span>' : '—') : nf1.format(v)}${v != null ? '<small>ms</small>' : ''}</div>
       <div class="f">10 s : max <span class="${mx > 60 ? 'c-bad' : mx > 30 ? 'c-warn' : ''}">${mx == null ? '—' : nf0.format(mx)}</span>${lost ? ` · <span class="c-bad">${lost} perdu${lost > 1 ? 's' : ''}</span>` : ''}</div></div>`;
   }).join('');
 }
@@ -1103,12 +1103,13 @@ function evRow(e) {
     <div><div class="w">Nouvel appareil : ${esc(e.device)}</div><div class="c">${e.renamed ? `Nommé automatiquement (avant : « ${esc(e.oldName || 'sans nom')} »). ` : ''}${esc(e.model || '')}${e.model ? ' · ' : ''}${e.via === 'cable' ? 'câble' : (e.via === 'repeteur' ? 'répéteur' : 'box') + ' ' + bandTxt(e.band)} · ${esc(e.ip || '')}</div></div>
     <div class="pk"><span class="chip acc">nouveau</span></div></div>`;
   const dur = Math.max(1, Math.round((e.end - e.start) / 1000));
-  return `<div class="ev${e.macNoise ? ' noise' : ''}"><div class="tm">${evTime(e.start)}</div>
-    <div><div class="w">${esc(e.device)}${e.lost ? ` · <span class="c-bad">${e.lost} ping${e.lost > 1 ? 's' : ''} perdu${e.lost > 1 ? 's' : ''}</span>` : ''}</div><div class="c">${esc(e.cause || '')}</div></div>
-    <div class="pk ${e.peak > 100 ? 'c-bad' : 'c-warn'}">${e.peak != null ? nf0.format(e.peak) + ' ms' : '—'}<small>${dur} s</small></div></div>`;
+  const durT = dur >= 3600 ? Math.floor(dur / 3600) + ' h ' + Math.round(dur % 3600 / 60) + ' min' : dur >= 120 ? Math.round(dur / 60) + ' min' : dur + ' s';
+  return `<div class="ev${e.macNoise || e.sleep ? ' noise' : ''}"><div class="tm">${evTime(e.start)}</div>
+    <div><div class="w">${esc(e.device)}${e.sleep ? ' <span class="chip">en veille</span>' : ''}${e.lost ? ` · <span class="c-bad">${e.lost} ping${e.lost > 1 ? 's' : ''} perdu${e.lost > 1 ? 's' : ''}</span>` : ''}</div><div class="c">${esc(e.cause || '')}</div></div>
+    <div class="pk ${e.sleep ? 'c-dim' : e.peak > 100 ? 'c-bad' : 'c-warn'}">${e.peak != null ? nf0.format(e.peak) + ' ms' : '—'}<small>${durT}</small></div></div>`;
 }
 let EV = [];
-function renderEvents() { const shown = EV.filter(e => !e.macNoise); $('#evList').innerHTML = shown.length ? shown.slice(0, 100).map(evRow).join('') : '<div class="empty">Aucun pic enregistré pour l\'instant.</div>'; const real = EV.filter(e => !e.macNoise && e.kind !== 'newdev').length; $('#evCount').textContent = `${real} pic${real > 1 ? 's' : ''} réel${real > 1 ? 's' : ''}${EV.length - real ? ' · ' + (EV.length - real) + ' faussé' + (EV.length - real > 1 ? 's' : '') + ' par le Mac' : ''}`; }
+function renderEvents() { const shown = EV.filter(e => !e.macNoise); $('#evList').innerHTML = shown.length ? shown.slice(0, 100).map(evRow).join('') : '<div class="empty">Aucun pic enregistré pour l\'instant.</div>'; const real = EV.filter(e => !e.macNoise && !e.sleep && e.kind !== 'newdev').length, fz = EV.filter(e => e.macNoise).length, sl = EV.filter(e => e.sleep).length; $('#evCount').textContent = `${real} pic${real > 1 ? 's' : ''} réel${real > 1 ? 's' : ''}${sl ? ' · ' + sl + ' en veille' : ''}${fz ? ' · ' + fz + ' faussé' + (fz > 1 ? 's' : '') + ' par ' + (MODE.active ? 'le serveur' : 'le Mac') : ''}`; }
 async function loadWatch() {
   try {
     const w = await api('/api/watch');
@@ -2264,6 +2265,7 @@ function connect() {
   on('devices', d => { const first = !S.devices.length; S.devices = d; renderRack(); if (first) loadOverview(); });
   on('macscan', m => { const el = $('#scanWarn'); if (m.n >= 2) { const who = m.procs.map(x => `${x.name} ×${x.n}`).join(', '); el.innerHTML = `<b>Le Mac cherche des réseaux Wi‑Fi en ce moment</b> (${esc(who)} en 30 s). Chaque recherche fait décrocher sa carte Wi‑Fi une seconde et fausse les mesures et les speed tests.${m.procs.some(x => /Réglages/.test(x.name)) ? ' Ferme la page Wi‑Fi des Réglages Système.' : ''}`; el.style.display = ''; } else el.style.display = 'none'; });
   on('newdev', e => toast(e.renamed ? `Nouvel appareil détecté et nommé : ${e.renamed}` : `Nouvel appareil détecté : ${e.device}`));
+  on('wrow', r => { const sl = {}; for (const [n, x] of Object.entries(r.p || {})) if (x.sleep) { const k = Object.keys(W.names).find(k => W.names[k] === n); if (k) sl[k] = true; } W.sleep = sl; });
   on('wping', onWping); on('wevent', e => { EV.unshift(e); renderEvents(); }); on('scan', onScan); on('ping', onPing); on('load', onLoad); on('loadEnd', onLoadEnd); on('full', onFull); on('fullEnd', onFullEnd); on('auth', onAuth);
   on('wanError', e => { if (/no_token|invalid_token|auth_failed/.test(e.code || '')) loadOverview(); });
   on('wifiopt', () => { if ($('#v-wifi').classList.contains('on')) woLoad(true); });

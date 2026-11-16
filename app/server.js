@@ -464,9 +464,23 @@ setInterval(() => {
     const noisy = smp.length - clean.length;
     const ok = clean.filter(x => x.ms != null).map(x => x.ms);
     const r = { n: clean.length, noise: noisy, lost: clean.length - ok.length, max: ok.length ? Math.max(...ok) : null, avg: ok.length ? round(ok.reduce((a, b) => a + b, 0) / ok.length) : null };
+    // Console en veille (mode repos) : sa carte Wi‑Fi dort et ne se réveille qu'aux balises de la box (~100 ms).
+    // Signature : ping moyen collé autour de 100 ms (pointes jusqu'à 1 s), quasi aucun trafic, box normale.
+    // Ce n'est pas un lag : on ne le compte pas comme un pic.
+    if (w.meta && w.meta.console) {
+      const sl = (watch.sleep ||= new Map()).get(k) || { h: [], asleep: false };
+      const dv = devCache.find(d => d.id === k);
+      sl.h.push({ avg: r.avg, traffic: dv ? (dv.down || 0) + (dv.up || 0) : 0 }); if (sl.h.length > 30) sl.h.shift();
+      const avgs = sl.h.map(x => x.avg).filter(x => x != null).sort((a, b) => a - b), med = avgs[Math.floor(avgs.length / 2)];
+      if (!sl.asleep && sl.h.length >= 30 && med >= 90 && med <= 200 && avgs[Math.floor(avgs.length * 0.2)] >= 55 && sl.h.every(x => x.traffic < 1000) && !refBad) { sl.asleep = true; const oe = watch.open.get(k); if (oe) oe.sleep = true; }
+      else if (sl.asleep && r.avg != null && r.avg < 30) { if ((sl.awake = (sl.awake || 0) + 1) >= 3) { sl.asleep = false; sl.awake = 0; sl.h = []; } }
+      else sl.awake = 0;
+      watch.sleep.set(k, sl);
+      if (sl.asleep) r.sleep = true;
+    }
     if (!w.meta || w.meta.console) row.p[w.name] = r;
-    // pic sur une console
-    if (w.meta && w.meta.console && ((r.max != null && r.max > 60) || r.lost > 0)) {
+    // pic sur une console (pas pendant sa veille)
+    if (w.meta && w.meta.console && !r.sleep && ((r.max != null && r.max > 60) || r.lost > 0)) {
       const top = devCache.filter(d => d.down + d.up > 300).sort((a, b) => (b.down + b.up) - (a.down + a.up)).slice(0, 3).map(d => ({ name: d.name, down: d.down, up: d.up }));
       let e = watch.open.get(k);
       if (e && t - e.last < 5000) { e.last = t; e.end = t; if (r.max != null && r.max > (e.peak || 0)) e.peak = r.max; e.lost += r.lost; e.wanMax = Math.max(e.wanMax || 0, wan.down || 0); if (refBad) e.macNoise = true; }
@@ -486,6 +500,7 @@ setInterval(() => {
 let macScan = { n: 0, procs: [], t: 0 };
 if (platform.OS === 'mac') setInterval(async () => { if (!clients.size) return; const r = await platform.wifiScans(); if (r) { macScan = r; broadcast('macscan', macScan); } }, 15000);
 function eventCause(e) {
+  if (e.sleep) return 'Console en veille (mode repos) : sa carte Wi‑Fi dort et ne répond qu\'à chaque signal de la box (environ toutes les 100 ms), d\'où des pings de 100 ms à 1 s. Ce n\'est pas un lag : en jeu, la console est réveillée et répond normalement.';
   if (e.macNoise) return `Le Wi‑Fi du ${platform.label} avait lui aussi un pic à ce moment : mesure peut-être faussée.`;
   if (e.wanMax > 500) return `La fibre recevait ${e.wanMax >= 1000 ? (Math.round(e.wanMax / 100) / 10 + ' Gb/s') : e.wanMax + ' Mb/s'} à ce moment (gros téléchargement dans la maison).`;
   if (e.top && e.top.length) return `Trafic à ce moment : ${e.top.map(x => `${x.name} ↓${x.down >= 1000 ? Math.round(x.down / 1000) + ' Mb/s' : x.down + ' kb/s'}`).join(', ')}.`;
