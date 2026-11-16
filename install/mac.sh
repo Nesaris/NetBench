@@ -1,12 +1,12 @@
 #!/bin/bash
 # Installe NetBench (anciennement Sonde) sur Mac (ou le met à jour, ou le désinstalle avec --uninstall).
-#   curl -fsSL https://raw.githubusercontent.com/Nesaris/netbench/main/install/mac.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/Nesaris/NetBench/main/install/mac.sh | bash
 # Rien n'est installé en dehors de ton dossier utilisateur, aucun mot de passe administrateur n'est demandé.
 # Node.js est téléchargé depuis nodejs.org (empreinte SHA-256 vérifiée) et Sonde depuis les releases GitHub
 # (signature Ed25519 du mainteneur vérifiée avant installation).
 set -euo pipefail
 
-REPO="${SONDE_REPO:-Nesaris/netbench}"
+REPO="${SONDE_REPO:-Nesaris/NetBench}"
 PUBKEY='MCowBQYDK2VwAyEAY03Xgj+jmh+tZbBD0cI+qQuVwLH+L6/0qAGwyCFflE4='
 LABEL=fr.nesaris.sonde
 SUP="$HOME/Library/Application Support/Sonde"

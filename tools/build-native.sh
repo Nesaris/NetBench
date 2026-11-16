@@ -25,7 +25,7 @@ cat > "$APP/Contents/Info.plist" <<PL
 <key>LSMinimumSystemVersion</key><string>11.0</string><key>LSMinimumSystemVersionByArchitecture</key><dict><key>arm64</key><string>11.0</string><key>x86_64</key><string>13.0</string></dict><key>NSHighResolutionCapable</key><true/>
 <key>LSApplicationCategoryType</key><string>public.app-category.utilities</string>
 <key>NSAppTransportSecurity</key><dict><key>NSAllowsLocalNetworking</key><true/></dict>
-<key>NSHumanReadableCopyright</key><string>Licence MIT — github.com/Nesaris/netbench</string>
+<key>NSHumanReadableCopyright</key><string>Licence MIT — github.com/Nesaris/NetBench</string>
 </dict></plist>
 PL
 codesign --force --sign - "$APP"
@@ -34,7 +34,7 @@ rm -f "$OUT/NetBench-mac.zip"; ditto -c -k --keepParent "$APP" "$OUT/NetBench-ma
 # ---- Windows
 cd "$ROOT/native-src/win"
 sed -i '' -E "s/\"(file|product)_version\": \"[0-9.]+\"/\"\1_version\": \"$VER.0\"/g" winres.json
-[ -f go.mod ] || { go mod init github.com/Nesaris/netbench/native-src/win >/dev/null 2>&1; }
+[ -f go.mod ] || { go mod init github.com/Nesaris/NetBench/native-src/win >/dev/null 2>&1; }
 go mod tidy >/dev/null 2>&1
 go run github.com/tc-hib/go-winres@v0.3.3 make --in winres.json --arch amd64 --out rsrc
 GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags "-H windowsgui -s -w" -o "$OUT/NetBench.exe" .

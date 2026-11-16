@@ -1,5 +1,5 @@
 # Installe NetBench (anciennement Sonde) sur Windows 10/11 (ou le met à jour ; -Uninstall pour le désinstaller).
-#   irm https://raw.githubusercontent.com/Nesaris/netbench/main/install/win.ps1 | iex
+#   irm https://raw.githubusercontent.com/Nesaris/NetBench/main/install/win.ps1 | iex
 # Rien n'est installé en dehors de ton profil, aucun droit administrateur n'est demandé.
 # Node.js vient de nodejs.org (empreinte SHA-256 vérifiée) et NetBench des releases GitHub
 # (signature Ed25519 du mainteneur vérifiée avant installation).
@@ -8,7 +8,7 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-$Repo = if ($env:SONDE_REPO) { $env:SONDE_REPO } else { 'Nesaris/netbench' }
+$Repo = if ($env:SONDE_REPO) { $env:SONDE_REPO } else { 'Nesaris/NetBench' }
 $PubKey = 'MCowBQYDK2VwAyEAY03Xgj+jmh+tZbBD0cI+qQuVwLH+L6/0qAGwyCFflE4='
 $Root = Join-Path $env:LOCALAPPDATA 'Sonde\app'
 $StartMenu = Join-Path $env:APPDATA 'Microsoft\Windows\Start Menu\Programs\NetBench.lnk'

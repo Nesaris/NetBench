@@ -18,7 +18,7 @@ import (
 )
 
 const base = "http://127.0.0.1:47800"
-const installCmd = "& ([scriptblock]::Create((irm https://raw.githubusercontent.com/Nesaris/netbench/main/install/win.ps1))) -NoLaunch"
+const installCmd = "& ([scriptblock]::Create((irm https://raw.githubusercontent.com/Nesaris/NetBench/main/install/win.ps1))) -NoLaunch"
 
 var (
 	root    = filepath.Join(os.Getenv("LOCALAPPDATA"), "Sonde", "app")

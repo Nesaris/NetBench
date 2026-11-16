@@ -27,7 +27,7 @@ var installed: Bool { FileManager.default.fileExists(atPath: (ROOT as NSString).
 // Première ouverture de l'app téléchargée : installe le moteur (Node.js vérifié + paquet signé), sans recréer d'icône
 func install() -> Bool {
   let p = Process(); p.executableURL = URL(fileURLWithPath: "/bin/bash")
-  p.arguments = ["-c", "set -o pipefail; /usr/bin/curl -fsSL https://raw.githubusercontent.com/Nesaris/netbench/main/install/mac.sh | /bin/bash -s -- --no-app"]
+  p.arguments = ["-c", "set -o pipefail; /usr/bin/curl -fsSL https://raw.githubusercontent.com/Nesaris/NetBench/main/install/mac.sh | /bin/bash -s -- --no-app"]
   p.standardOutput = FileHandle.nullDevice; p.standardError = FileHandle.nullDevice
   do { try p.run() } catch { return false }
   p.waitUntilExit(); return p.terminationStatus == 0 && installed
