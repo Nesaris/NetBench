@@ -158,6 +158,24 @@ label.chk input{accent-color:var(--accent)}
 .note b{color:var(--text);font-weight:500}
 .callout{border:1px solid var(--line-2);border-left:3px solid var(--warn);background:var(--panel);border-radius:var(--r);padding:10px 14px;font-size:var(--t-sm);color:var(--text-2)}
 .callout.info{border-left-color:var(--accent)}
+/* optimisation Wi-Fi */
+.wo-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr));gap:14px}
+.wo-reason{font-size:var(--t-sm);color:var(--text-2);margin-bottom:12px;max-width:72ch}
+.wo-spec{width:100%;height:132px;display:block;margin-bottom:6px}
+.wo-spec text{font:10px var(--mono);fill:var(--text-3)}
+.wo-leg{display:flex;flex-wrap:wrap;gap:14px;font-size:var(--t-xs);color:var(--text-3);margin-bottom:12px}
+.wo-leg i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.wo-nb{width:100%;border-collapse:collapse;font-size:var(--t-xs);margin-bottom:12px}
+.wo-nb td{padding:5px 6px;border-top:1px solid var(--line);font-family:var(--mono);white-space:nowrap}
+.wo-nb td:first-child{font-family:var(--sans);white-space:normal;color:var(--text)}
+.wo-ctl{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding-top:12px;border-top:1px solid var(--line)}
+.wo-ctl label{font-size:var(--t-xs);color:var(--text-3);display:flex;align-items:center;gap:6px}
+.wo-ctl select{height:30px;font-size:var(--t-sm)}
+.wo-set{display:grid;grid-template-columns:1fr auto;gap:10px 16px;align-items:center;font-size:var(--t-sm)}
+.wo-set .m{font-size:var(--t-xs);color:var(--text-3);margin-top:2px;max-width:60ch}
+.wo-log li{list-style:none;padding:8px 0;border-top:1px solid var(--line);font-size:var(--t-sm)}
+.wo-log li:first-child{border-top:0}
+.wo-log time{font-family:var(--mono);font-size:var(--t-xs);color:var(--text-3);margin-right:8px}
 .empty{padding:40px 16px;text-align:center;color:var(--text-3);font-size:var(--t-sm)}
 
 /* radios / ports */
@@ -345,7 +363,7 @@ input.txt{height:34px;width:100%;border-radius:var(--r);border:1px solid var(--l
 .flist{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
 body.no-signal #dTable :is(th,td):nth-child(3){display:none}
 body.no-rate #dTable :is(th,td):is(:nth-child(5),:nth-child(6),:nth-child(7)){display:none}
-body.no-block [data-need~=block],body.no-rename [data-need~=rename],body.no-nq [data-need~=nq],body.no-repeater [data-need~=repeater],body.no-ports [data-need~=ports],body.no-wanrate [data-need~=wanrate]{display:none!important}
+body.no-wifiopt [data-need~=wifiopt],body.no-block [data-need~=block],body.no-rename [data-need~=rename],body.no-nq [data-need~=nq],body.no-repeater [data-need~=repeater],body.no-ports [data-need~=ports],body.no-wanrate [data-need~=wanrate]{display:none!important}
 .auth h1{font-size:var(--t-xl);font-weight:600}
 .auth p{color:var(--text-2);margin:10px 0 18px;line-height:1.55}
 
@@ -441,6 +459,7 @@ body.setup #bSet{display:none}
     <nav class="tabs" role="tablist">
       <button role="tab" data-v="live" aria-selected="true">Direct</button>
       <button role="tab" data-v="devs" aria-selected="false">Appareils</button>
+      <button role="tab" data-v="wifi" aria-selected="false" data-need="wifiopt">Wi‑Fi</button>
       <button role="tab" data-v="svc" aria-selected="false">Services</button>
       <button role="tab" data-v="scan" aria-selected="false">Scan<span class="run" id="rScan"></span></button>
       <button role="tab" data-v="ping" aria-selected="false">Ping<span class="run" id="rPing"></span></button>
@@ -530,6 +549,27 @@ body.setup #bSet{display:none}
     </section>
 
     <!-- SERVICES -->
+    <!-- OPTIMISER LE WI-FI -->
+    <section class="view" id="v-wifi">
+      <div class="view-head">
+        <div>
+          <h1>Optimiser le Wi‑Fi</h1>
+          <p>Pour chaque bande de la box : les réseaux voisins qui utilisent les mêmes canaux, l'occupation de l'air mesurée par la box, et le réglage qui donne le plus de débit. « Tout optimiser » applique les recommandations ; tu peux aussi tout régler à la main. Rien ne change pendant qu'une console est en jeu.</p>
+        </div>
+        <div class="controls">
+          <label class="chk" title="Toutes les 20 minutes, quand personne n'utilise le réseau et qu'aucune console ne joue, NetBench change de canal si un autre est nettement meilleur (au plus une fois toutes les 6 heures par bande, jamais vers un canal radar)."><input type="checkbox" id="woAuto"> Optimisation automatique</label>
+          <button class="btn" id="woRefresh">Actualiser</button>
+          <button class="btn primary" id="woAll">Tout optimiser</button>
+        </div>
+      </div>
+      <div id="woBanner"></div>
+      <div id="woRadios" class="wo-grid"><div class="empty">Lecture des réglages Wi‑Fi de la box…</div></div>
+      <div class="wo-grid" style="margin-top:14px">
+        <div class="panel"><div class="panel-h"><h3>Réglages généraux</h3><span class="sub" id="woSsid"></span></div><div class="panel-b" id="woGlobal"></div></div>
+        <div class="panel"><div class="panel-h"><h3>Journal des changements</h3><span class="sub">manuels, en un clic et automatiques</span></div><div class="panel-b"><ul class="wo-log" id="woLog"></ul></div></div>
+      </div>
+    </section>
+
     <section class="view" id="v-svc">
       <div class="view-head">
         <div>
@@ -975,7 +1015,7 @@ $$('.quick button').forEach(b => b.onclick = () => {
 const selected = () => S.devices.filter(d => S.sel.has(d.id) && d.ip);
 
 /* ============ onglets ============ */
-function show(v) { $$('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.v === v)); $$('.view').forEach(x => x.classList.toggle('on', x.id === 'v-' + v)); if (v === 'hist') loadHist(); if (v === 'svc') svcInit(); if (v === 'devs') renderDevTable(); if (v === 'cmp') loadReports(); if (v === 'scan' && !S.scan) loadScans(); store.set('tab', v); }
+function show(v) { $$('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.v === v)); $$('.view').forEach(x => x.classList.toggle('on', x.id === 'v-' + v)); if (v === 'hist') loadHist(); if (v === 'svc') svcInit(); if (v === 'wifi') woLoad(); if (v === 'devs') renderDevTable(); if (v === 'cmp') loadReports(); if (v === 'scan' && !S.scan) loadScans(); store.set('tab', v); }
 $$('nav.tabs button').forEach(b => b.onclick = () => show(b.dataset.v));
 
 /* ============ DIRECT ============ */
@@ -1455,6 +1495,134 @@ $$('#svcView button').forEach(b => b.onclick = () => { $$('#svcView button').for
 $('#svcRange').style.visibility = 'hidden';
 
 /* ---- blocages ---- */
+/* ============ OPTIMISER LE WI-FI ============ */
+const WOS = { d: null, sel: {} };
+const ENC = { wpa3_psk_ccmp: 'WPA3', wpa23_psk_ccmp: 'WPA2 / WPA3', wpa23_psk_ccmp_mrsno: 'WPA2 / WPA3', wpa2_psk_ccmp: 'WPA2', wpa2_psk_auto: 'WPA2', wpa12_psk_auto: 'WPA / WPA2 (ancien)', wpa_psk_tkip: 'WPA (ancien)', wep: 'WEP (dangereux)', none: 'aucun (ouvert)' };
+const VERD = { optimal: ['ok', 'Optimal'], ameliorable: ['warn', 'Améliorable'], fort: ['bad', 'À changer'], off: ['', 'Coupée'] };
+function askList(title, text, items, ok) {
+  return new Promise(res => {
+    $('#mT').textContent = title; $('#mP').textContent = text; $('#mL').innerHTML = items.map(x => `<li>${esc(x)}</li>`).join(''); $('#mL').style.display = items.length ? '' : 'none';
+    $('#mYes').textContent = ok; $('#modal').classList.add('on'); $('#mNo').focus();
+    const done = v => { $('#modal').classList.remove('on'); $('#mYes').onclick = $('#mNo').onclick = null; res(v); };
+    $('#mYes').onclick = () => done(true); $('#mNo').onclick = () => done(false);
+  });
+}
+async function woLoad(quiet) {
+  if (!FEAT?.wifiOpt) return;
+  try { WOS.d = await api('/api/wifi/opt'); } catch (e) { if (!quiet) $('#woRadios').innerHTML = `<div class="empty">${esc(e.message)}</div>`; return; }
+  if (WOS.d.unsupported || WOS.d.error) { $('#woRadios').innerHTML = `<div class="empty">${esc(WOS.d.error)}</div>`; return; }
+  woRender();
+}
+function woSpectrum(r) {
+  const a = r.analysis || {}, chans = [...new Set([...r.usage.map(u => u.channel), ...r.allowed.map(c => c.primary)])].sort((x, y) => x - y);
+  if (!chans.length) return '';
+  const W = 600, H = 132, top = 8, bot = 18, h = H - top - bot, step = W / chans.length, x = c => { const i = chans.indexOf(c); return i < 0 ? null : i * step; };
+  const blk = (c, w) => { if (r.band === '2d4g') { const lo = c - 2, hi = c + 2 + (w >= 40 ? 4 : 0); return chans.filter(k => k >= lo && k <= hi); } const n = Math.max(1, (+w || 20) / 20); if (r.band === '6g') { const i = (c - 1) / 4, s0 = Math.floor(i / n) * n; return chans.filter(k => k >= 1 + 4 * s0 && k < 1 + 4 * (s0 + n)); } const g = { 40: 2, 80: 4, 160: 8 }[w] || 1; const base = g === 8 ? (c < 100 ? 36 : 100) : g === 1 ? c : (() => { const all = chans.filter(k => k >= 36); const i = all.indexOf(c); return all[Math.floor(i / g) * g] ?? c; })(); return chans.filter(k => k >= base && k < base + 4 * g); };
+  const rect = (cs, y, hh, attrs, tip) => { if (!cs.length) return ''; const x0 = x(cs[0]), x1 = x(cs[cs.length - 1]) + step; return `<rect x="${x0 + 1}" y="${y}" width="${Math.max(2, x1 - x0 - 2)}" height="${hh}" rx="3" ${attrs}>${tip ? `<title>${esc(tip)}</title>` : ''}</rect>`; };
+  let g = '';
+  for (const u of r.usage) { const X = x(u.channel); if (X == null) continue; const bh = Math.max(1, u.busy / 100 * h); g += `<rect x="${X + step * 0.2}" y="${top + h - bh}" width="${step * 0.6}" height="${bh}" style="fill:var(--text-3);opacity:.45"><title>Canal ${u.channel} : air occupé ${u.busy} %</title></rect>`; }
+  for (const n of r.neighbors) { const s = Math.max(0.15, Math.min(1, (n.signal + 92) / 30)); g += rect(blk(n.channel, n.width), top + h - s * h, s * h, 'style="fill:var(--warn);fill-opacity:.22;stroke:var(--warn);stroke-opacity:.7"', `${n.ssid || 'réseau masqué'} · canal ${n.channel} · ${n.width} MHz · ${n.signal} dBm`); }
+  g += rect(blk(r.status.primary, r.status.width), top, h, 'style="fill:none;stroke:var(--accent);stroke-width:2"');
+  if (a.best && ['fort', 'ameliorable'].includes(a.verdict)) g += rect(blk(a.best.primary, a.best.width), top + 3, h - 6, 'style="fill:none;stroke:var(--ok);stroke-width:2;stroke-dasharray:5 4"');
+  const lab = chans.length > 30 ? chans.filter((_, i) => i % 4 === 0) : chans;
+  for (const c of lab) g += `<text x="${x(c) + step / 2}" y="${H - 4}" text-anchor="middle">${c}</text>`;
+  return `<svg class="wo-spec" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Occupation des canaux ${esc(r.label)}">${g}</svg>
+    <div class="wo-leg"><span><i style="background:var(--text-3);opacity:.5"></i>air occupé (mesuré par la box)</span><span><i style="background:var(--warn);opacity:.5"></i>réseaux voisins (hauteur = force)</span><span><i style="border:2px solid var(--accent)"></i>canal actuel</span>${a.best && ['fort', 'ameliorable'].includes(a.verdict) ? '<span><i style="border:2px dashed var(--ok)"></i>recommandé</span>' : ''}</div>`;
+}
+function woRender() {
+  const d = WOS.d;
+  $('#woAuto').checked = !!d.auto;
+  const ban = [];
+  if (d.pending) ban.push(`<div class="callout" style="margin-bottom:14px;display:flex;justify-content:space-between;gap:12px;align-items:center"><span><b>En attente :</b> les changements seront appliqués dès que ${esc((d.gaming.length ? d.gaming : d.pending.wait || []).join(', ') || 'la partie')} aura fini de jouer.</span><button class="btn sm" id="woCancel">Annuler</button></div>`);
+  else if (d.gaming.length) ban.push(`<div class="callout" style="margin-bottom:14px">${esc(d.gaming.join(', '))} en jeu : les changements de canal seront mis en attente jusqu'à la fin de la partie.</div>`);
+  $('#woBanner').innerHTML = ban.join('');
+  if ($('#woCancel')) $('#woCancel').onclick = async () => { await api('/api/wifi/cancel', {}); woLoad(); };
+  $('#woRadios').innerHTML = d.radios.map(r => {
+    const a = r.analysis || {}, [vc, vl] = VERD[a.verdict] || ['', ''];
+    const sel = WOS.sel[r.id] || { primary: r.auto ? 0 : r.config.primary, width: r.config.width };
+    const widths = [...new Set(r.allowed.map(c => c.width))].sort((x, y) => x - y);
+    const prim = r.allowed.filter(c => c.width === +sel.width).map(c => c.primary).sort((x, y) => x - y);
+    const nb = [...r.neighbors].sort((x, y) => y.signal - x.signal).slice(0, 8);
+    const changed = (+sel.primary !== (r.auto ? 0 : r.config.primary)) || (+sel.width !== r.config.width);
+    return `<div class="panel" data-r="${r.id}">
+      <div class="panel-h"><div><h3>${esc(r.label)}</h3><div class="sub">${r.enabled ? `canal ${r.status.primary}${r.auto ? ' (auto)' : ''} · ${r.status.width} MHz · ${r.clients} appareil${r.clients > 1 ? 's' : ''}${r.status.cac ? ` · écoute radar ${r.status.cac} s` : ''}` : 'bande coupée'}</div></div>${vl ? `<span class="chip ${vc}">${vl}${a.gain && a.verdict !== 'optimal' ? ' · +' + a.gain + ' %' : ''}</span>` : ''}</div>
+      <div class="panel-b">
+        <p class="wo-reason">${esc(a.reason || '')}</p>
+        ${r.enabled ? woSpectrum(r) : ''}
+        ${nb.length ? `<table class="wo-nb"><tbody>${nb.map(n => `<tr><td>${esc(n.ssid || 'réseau masqué')}</td><td>canal ${n.channel}${n.width > 20 ? ' · ' + n.width + ' MHz' : ''}</td><td>${esc(n.std)}</td><td class="sig ${n.signal >= -67 ? 'bad' : n.signal >= -80 ? 'warn' : 'ok'}" title="Plus le voisin est fort, plus il gêne">${n.signal} dBm</td></tr>`).join('')}</tbody></table>` : `<p class="c-dim" style="font-size:var(--t-xs);margin-bottom:12px">Aucun réseau voisin vu par la box sur cette bande lors de sa dernière recherche.</p>`}
+        <div class="wo-ctl">
+          <label>Canal <select class="search" data-k="primary"><option value="0"${+sel.primary === 0 ? ' selected' : ''}>Automatique</option>${prim.map(c => `<option value="${c}"${+sel.primary === c ? ' selected' : ''}>${c}${r.allowed.find(x => x.primary === c && x.width === +sel.width)?.dfs ? ' (radar)' : ''}</option>`).join('')}</select></label>
+          <label>Largeur <select class="search" data-k="width">${widths.map(w => `<option value="${w}"${+sel.width === w ? ' selected' : ''}>${w} MHz</option>`).join('')}</select></label>
+          <button class="btn sm${changed ? ' primary' : ''}" data-act="apply"${changed ? '' : ' disabled'}>Appliquer</button>
+          ${['fort', 'ameliorable'].includes(a.verdict) ? `<button class="btn sm" data-act="reco">Appliquer la recommandation</button>` : ''}
+          <span style="flex:1"></span>
+          <button class="btn sm ghost" data-act="scan" title="La box cherche à nouveau les réseaux voisins (quelques secondes)">Rechercher les voisins</button>
+          <button class="btn sm ghost" data-act="power">${r.enabled ? 'Couper la bande' : 'Allumer la bande'}</button>
+        </div>
+      </div></div>`;
+  }).join('') || '<div class="empty">Aucune bande Wi‑Fi trouvée.</div>';
+  $$('#woRadios [data-r]').forEach(el => {
+    const r = d.radios.find(x => x.id === +el.dataset.r);
+    el.querySelectorAll('select').forEach(s => s.onchange = () => {
+      const cur = WOS.sel[r.id] || { primary: r.auto ? 0 : r.config.primary, width: r.config.width };
+      cur[s.dataset.k] = +s.value;
+      if (s.dataset.k === 'width' && cur.primary && !r.allowed.some(c => c.width === cur.width && c.primary === cur.primary)) cur.primary = r.allowed.find(c => c.width === cur.width)?.primary || 0;
+      WOS.sel[r.id] = cur; woRender();
+    });
+    el.querySelectorAll('[data-act]').forEach(b => b.onclick = async () => {
+      const act = b.dataset.act;
+      if (act === 'scan') return woScan(r);
+      if (act === 'power') return woSend('/api/wifi/apply', { radios: [{ id: r.id, enabled: !r.enabled }] }, [`${r.label} ${r.enabled ? 'coupée' : 'allumée'}`], r.enabled ? `Les appareils connectés en ${r.label} passeront sur une autre bande (ou perdront le Wi‑Fi s'ils ne savent pas).` : '');
+      const x = act === 'reco' ? { id: r.id, primary: r.analysis.best.primary, width: r.analysis.best.width } : { id: r.id, ...(WOS.sel[r.id] || {}) };
+      const dfs = x.primary && r.allowed.find(c => c.primary === +x.primary && c.width === +x.width)?.dfs;
+      await woSend('/api/wifi/apply', { radios: [x] }, [`${r.label} : ${+x.primary ? 'canal ' + x.primary : 'canal automatique'}, ${x.width || r.config.width} MHz`], `Les appareils en ${r.label} décrochent quelques secondes le temps de se reconnecter.${dfs ? ' Canal radar : la box écoute environ 1 minute avant d\'émettre.' : ''}`);
+      delete WOS.sel[r.id];
+    });
+  });
+  // réglages généraux
+  const g = d.global, adv = d.advice || [];
+  $('#woSsid').textContent = g.ssid ? 'réseau « ' + g.ssid + ' »' : '';
+  $('#woGlobal').innerHTML = `<div class="wo-set">
+    <div><b>Économie d'énergie du Wi‑Fi</b><div class="m">Baisse la puissance et coupe des antennes quand le réseau est calme. Moins de consommation, mais moins de portée et des pics de latence au réveil.</div></div><button class="btn sm" data-g="powerSaving" data-v="${!g.powerSaving}">${g.powerSaving ? 'Couper' : 'Activer'}</button>
+    <div><b>WPS</b> <span class="chip ${g.wps ? 'warn' : 'ok'}">${g.wps ? 'activé' : 'désactivé'}</span><div class="m">Appairage par bouton ou code PIN. Faille connue ; inutile pour les appareils récents, qui se connectent avec le mot de passe ou un QR code.</div></div><button class="btn sm" data-g="wps" data-v="${!g.wps}">${g.wps ? 'Désactiver' : 'Activer'}</button>
+    <div><b>Chiffrement</b><div class="m">${esc(ENC[g.encryption] || g.encryption || 'inconnu')}. À changer dans Freebox OS si besoin : tous les appareils devront se reconnecter.</div></div><span></span>
+  </div>${adv.length ? `<div class="callout info" style="margin-top:14px">Recommandé : ${adv.map(x => esc(x.title)).join(' · ')}</div>` : ''}`;
+  $$('#woGlobal [data-g]').forEach(b => b.onclick = () => { const k = b.dataset.g, v = b.dataset.v === 'true'; woSend('/api/wifi/apply', { global: { [k]: v } }, [k === 'wps' ? `WPS ${v ? 'activé' : 'désactivé'}` : `Économie d'énergie ${v ? 'activée' : 'coupée'}`], ''); });
+  $('#woLog').innerHTML = (d.log || []).map(l => `<li><time>${new Date(l.t).toLocaleString('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</time><span class="chip">${esc(l.source)}</span><div style="margin-top:4px">${l.changes.map(esc).join('<br>')}</div></li>`).join('') || '<li class="c-dim">Aucun changement pour l\'instant.</li>';
+}
+async function woSend(url, body, items, warn) {
+  if (!(await askList('Appliquer ces changements ?', warn || 'Les changements sont appliqués tout de suite sur la box.', items, 'Appliquer'))) return;
+  try {
+    const r = await api(url, body);
+    toast(r.pending ? 'Changement mis en attente : il sera appliqué à la fin de la partie.' : r.note || (r.changes?.length ? 'Fait : ' + r.changes.join(' ; ') : 'Rien à changer.'));
+  } catch (e) {
+    if (e.status === 409 && e.body?.gaming) {
+      if (await askList('Une console est en jeu', `${e.body.gaming.join(', ')} joue en ce moment. Changer de canal couperait le Wi‑Fi quelques secondes. NetBench peut attendre la fin de la partie et appliquer tout seul.`, items, 'Appliquer après la partie')) {
+        try { const r2 = await api(url, { ...body, later: true }); toast((r2.changes?.length ? 'Fait : ' + r2.changes.join(' ; ') + '. ' : '') + 'Changement de canal mis en attente : appliqué à la fin de la partie.'); } catch (e2) { toast(e2.message, true); }
+      }
+    } else toast(e.message, true);
+  }
+  woLoad();
+}
+async function woScan(r) {
+  const go = async force => { await api('/api/wifi/scan', { id: r.id, force }); toast(`Recherche des voisins en ${r.label}… résultats dans quelques secondes.`); setTimeout(() => woLoad(true), 9000); };
+  try { await go(false); } catch (e) {
+    if (e.status === 409 && e.body?.gaming) { if (await askList('Une console est en jeu', `${e.body.gaming.join(', ')} joue. La recherche des voisins peut faire décrocher le Wi‑Fi une seconde.`, [], 'Chercher quand même')) await go(true).catch(x => toast(x.message, true)); }
+    else toast(e.message, true);
+  }
+}
+$('#woRefresh').onclick = () => woLoad();
+$('#woAuto').onchange = async e => { try { await api('/api/wifi/auto', { on: e.target.checked }); toast(e.target.checked ? 'Optimisation automatique activée : seulement quand le réseau est calme et qu\'aucune console ne joue.' : 'Optimisation automatique coupée.'); } catch (x) { toast(x.message, true); } };
+$('#woAll').onclick = async () => {
+  if (!WOS.d) await woLoad(); const d = WOS.d; if (!d?.radios) return;
+  const items = [];
+  for (const r of d.radios) if (r.enabled && ['fort', 'ameliorable'].includes(r.analysis.verdict)) items.push(`${r.label} : canal ${r.status.primary} → ${r.analysis.best.primary}, ${r.status.width} → ${r.analysis.best.width} MHz (+${r.analysis.gain} %)`);
+  for (const x of d.advice || []) if (!x.info) items.push(x.title);
+  if (!items.length) return toast('Tout est déjà optimisé : rien à changer.');
+  await woSend('/api/wifi/optimize', {}, items, 'Les bandes qui changent de canal décrochent quelques secondes, le temps que les appareils se reconnectent.');
+};
+setInterval(() => { if ($('#v-wifi').classList.contains('on') && !$('#modal').classList.contains('on')) woLoad(true); }, 30000);
+
 function ask(title, text, ok) {
   return new Promise(res => {
     $('#mT').textContent = title; $('#mP').textContent = text; $('#mL').innerHTML = ''; $('#mL').style.display = 'none';
@@ -2014,7 +2182,7 @@ async function applyFeatures() {
   FEAT = su.features || {}; OSN = su.osLabel || 'Mac'; S.gw = String(su.config?.host || '').split(':')[0] || null;
   liveSrcText();
   const b = document.body;
-  for (const [cls, on] of [['no-signal', !FEAT.signal], ['no-rate', !FEAT.perDeviceRate], ['no-block', !FEAT.block], ['no-rename', !FEAT.rename], ['no-nq', !su.hasNQ], ['no-repeater', !FEAT.repeater], ['no-ports', !FEAT.ports], ['no-wanrate', !FEAT.wanRate]]) b.classList.toggle(cls, !!on);
+  for (const [cls, on] of [['no-wifiopt', !FEAT.wifiOpt], ['no-signal', !FEAT.signal], ['no-rate', !FEAT.perDeviceRate], ['no-block', !FEAT.block], ['no-rename', !FEAT.rename], ['no-nq', !su.hasNQ], ['no-repeater', !FEAT.repeater], ['no-ports', !FEAT.ports], ['no-wanrate', !FEAT.wanRate]]) b.classList.toggle(cls, !!on);
   if (OSN !== 'Mac') relabel(document.body);
 }
 // Sur Windows, « Mac » devient « PC » partout dans l'interface (textes fixes et textes générés)
@@ -2088,11 +2256,12 @@ function connect() {
   on('newdev', e => toast(e.renamed ? `Nouvel appareil détecté et nommé : ${e.renamed}` : `Nouvel appareil détecté : ${e.device}`));
   on('wping', onWping); on('wevent', e => { EV.unshift(e); renderEvents(); }); on('scan', onScan); on('ping', onPing); on('load', onLoad); on('loadEnd', onLoadEnd); on('full', onFull); on('fullEnd', onFullEnd); on('auth', onAuth);
   on('wanError', e => { if (/no_token|invalid_token|auth_failed/.test(e.code || '')) loadOverview(); });
+  on('wifiopt', () => { if ($('#v-wifi').classList.contains('on')) woLoad(true); });
   on('update', () => loadUpdate()); on('updated', u => { toast(`NetBench a été mis à jour (version ${u.version}). Redémarrage…`); setTimeout(() => location.reload(), 6000); });
 }
 $('#bQuit').onclick = async () => { await api('/api/quit', {}).catch(() => { }); document.body.innerHTML = '<div class="empty" style="padding-top:30vh">NetBench est fermé. Tu peux fermer cette fenêtre.</div>'; setTimeout(() => window.close(), 400); };
 
-{ const t = location.hash.slice(1) || store.get('tab', 'live'); show(['live', 'devs', 'svc', 'scan', 'ping', 'load', 'full', 'cmp', 'hist'].includes(t) ? t : 'live'); }
+{ const t = location.hash.slice(1) || store.get('tab', 'live'); show(['live', 'devs', 'wifi', 'svc', 'scan', 'ping', 'load', 'full', 'cmp', 'hist'].includes(t) ? t : 'live'); }
 applyFeatures().then(loadUpdate); loadNote(); loadOverview(); connect(); loop(); setTimeout(loadWatch, 4000); setInterval(() => { if (!cCons.series.size || cCons.series.size < 3) loadWatch(); }, 5000);
 setInterval(loadOverview, 4000);
 // fraîcheur des données affichée dans l'en-tête

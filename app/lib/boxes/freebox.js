@@ -114,7 +114,7 @@ function create(ctx, cfg) {
 
   return {
     id: 'freebox', label: 'Freebox', host,
-    features: { signal: true, perDeviceRate: true, wanRate: true, rename: true, block: true, cableBlock: false, ports: true, repeater: true, vm: true, auth: 'button' },
+    features: { signal: true, perDeviceRate: true, wanRate: true, rename: true, block: true, cableBlock: false, ports: true, repeater: true, vm: true, wifiOpt: true, auth: 'button' },
     async authState() { return { ok: !!fbx.token(), kind: 'button' }; },
     async authorize() {
       if (fbx.authorizing) return fbx.authorizing;
@@ -186,6 +186,40 @@ function create(ctx, cfg) {
         const left = ((await fbx.call('GET', '/wifi/mac_filter/')) || []).filter(x => x.type === 'blacklist');
         if (!left.length) await fbx.put('/wifi/config/', { mac_filter_state: 'disabled' });
       }
+    },
+    // ---------------------------------------------------------- optimisation du Wi-Fi
+    // État de chaque bande : réglage, canal réel, voisins vus par la box, occupation de chaque canal, canaux permis.
+    // (La clé Wi‑Fi n'est jamais lue ni renvoyée.)
+    async wifiState() {
+      const [aps, cfg, wps, bss] = await Promise.all([fbx.get('/wifi/ap/'), fbx.get('/wifi/config/').catch(() => ({})), fbx.get('/wifi/wps/config/').catch(() => ({})), fbx.get('/wifi/bss/').catch(() => [])]);
+      const radios = await Promise.all((aps || []).map(async a => {
+        const id = a.id, c = a.config || {}, st = a.status || {};
+        const [nb, use, comb, sta] = await Promise.all(['neighbors/', 'channel_usage/', 'allowed_channel_comb/', 'stations/'].map(x => fbx.get(`/wifi/ap/${id}/${x}`).catch(() => [])));
+        return {
+          id, name: a.name, band: c.band, enabled: c.enabled !== false && st.state !== 'disabled', state: st.state, auto: !+c.primary_channel,
+          config: { primary: +c.primary_channel || 0, secondary: +c.secondary_channel || 0, width: +c.channel_width || 20, dfs: !!c.dfs_enabled },
+          status: { primary: +st.primary_channel || 0, secondary: +st.secondary_channel || 0, width: +st.channel_width || +c.channel_width || 20, cac: st.dfs_cac_remaining_time || 0 },
+          clients: (sta || []).filter(x => x.host?.active !== false).length,
+          neighbors: (nb || []).map(n => ({ ssid: String(n.ssid || '').slice(0, 64), bssid: n.bssid, channel: +n.channel, secondary: +n.secondary_channel || 0, width: +n.channel_width || 20, signal: n.signal, std: n.capabilities?.eht ? 'Wi‑Fi 7' : n.capabilities?.he ? 'Wi‑Fi 6' : n.capabilities?.vht ? 'Wi‑Fi 5' : n.capabilities?.ht ? 'Wi‑Fi 4' : 'ancien' })),
+          usage: (use || []).map(u => ({ channel: +u.channel, busy: +u.rx_busy_percent || 0, noise: u.noise_level })),
+          allowed: (comb || []).map(x => ({ primary: +x.primary, secondary: +x.secondary || 0, width: +x.channel_width || 20, dfs: !!x.need_dfs, cac: x.dfs_cac_time || 0 }))
+        };
+      }));
+      const main = (bss || []).find(b => b.status?.is_main_bss) || (bss || [])[0];
+      return { radios, global: { powerSaving: !!cfg.power_saving, wps: !!wps.enabled, encryption: main?.config?.encryption || null, ssid: main?.config?.ssid || null } };
+    },
+    async wifiScan(id) { await fbx.call('POST', `/wifi/ap/${+id}/neighbors/scan/`, {}); },
+    // Change le canal / la largeur d'une bande (primary 0 = la box choisit toute seule)
+    async wifiSetRadio(id, o) {
+      const c = {};
+      if (o.enabled !== undefined) c.enabled = !!o.enabled;
+      if (o.width !== undefined) c.channel_width = String(+o.width);
+      if (o.primary !== undefined) { c.primary_channel = +o.primary; c.secondary_channel = +o.secondary || 0; }
+      await fbx.put(`/wifi/ap/${+id}`, { config: c });
+    },
+    async wifiSetGlobal(o) {
+      if (o.powerSaving !== undefined) await fbx.put('/wifi/config/', { power_saving: !!o.powerSaving });
+      if (o.wps !== undefined) await fbx.put('/wifi/wps/config/', { enabled: !!o.wps });
     },
     blockNote: 'L\'appareil est refusé sur le Wi‑Fi de la box (filtrage par adresse MAC). Un appareil en câble ne peut pas être bloqué.'
   };

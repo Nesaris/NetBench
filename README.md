@@ -55,6 +55,7 @@ Ce que chaque box permet :
 | Débit de la fibre en direct | oui | oui | oui | non |
 | Renommer un appareil | oui | oui | oui | non |
 | Bloquer un appareil | oui (Wi‑Fi) | oui | non | non |
+| Optimiser le Wi‑Fi (canaux voisins, largeur, en un clic ou automatique) | oui | pas encore | pas encore | pas encore |
 
 Le ping, les tests de débit, la surveillance des pics et les rapports marchent avec toutes les box, puisqu'ils sont mesurés depuis l'ordinateur.
 

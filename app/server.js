@@ -12,6 +12,7 @@ const platform = require('./lib/platform');
 const boxes = require('./lib/boxes');
 const updater = require('./lib/updater');
 const brands = require('./lib/brands');
+const wifiopt = require('./lib/wifiopt');
 
 const VERSION = (() => { try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'version.json'), 'utf8')).version; } catch { return '0.0.0'; } })();
 const PORT = +process.env.SONDE_PORT || 47800;
@@ -85,6 +86,80 @@ async function getDevices() {
     return F('signal') ? markSleep(d) : d;
   }).sort((a, b) => (b.isConsole - a.isConsole) || a.name.localeCompare(b.name));
 }
+
+// ---------------------------------------------------------------- optimisation du Wi-Fi (canaux, largeur, réglages)
+// Règle de la maison : on ne coupe jamais le Wi‑Fi pendant qu'une console est en jeu. Un changement demandé
+// à ce moment-là est mis en attente et appliqué quand la partie est finie.
+const WO_FILE = path.join(DATA_DIR, 'wifiopt.json');
+const WO = (() => { try { return { auto: false, log: [], pending: null, last: {}, ...JSON.parse(fs.readFileSync(WO_FILE, 'utf8')) }; } catch { return { auto: false, log: [], pending: null, last: {} }; } })();
+const woSave = () => fs.writeFile(WO_FILE, JSON.stringify(WO), () => { });
+const gamingNow = () => devCache.filter(d => d.gaming).map(d => d.name);
+const fmtRadio = (r, x) => x.primary === 0 ? `${r.label} : canal automatique` : `${r.label} : canal ${r.status.primary} → ${x.primary}, ${r.status.width} → ${x.width} MHz`;
+async function wifiAnalyse() {
+  if (!box || !F('wifiOpt')) throw Object.assign(new Error('Cette box ne permet pas encore de régler son Wi‑Fi depuis NetBench.'), { code: 'unsupported' });
+  const st = await box.wifiState();
+  const radios = st.radios.map(r => ({ ...r, label: (wifiopt.BAND_LABEL[r.band] || r.name) + (st.radios.filter(o => o.band === r.band).length > 1 ? ' (antenne ' + (st.radios.filter(o => o.band === r.band).indexOf(r) + 1) + ')' : ''), analysis: r.enabled ? wifiopt.analyse(r, st.radios.filter(o => o !== r && o.band === r.band && o.enabled)) : { verdict: 'off', reason: 'Bande coupée.', gain: 0 } }));
+  return { radios, global: st.global, advice: wifiopt.globalAdvice(st.global), auto: WO.auto, pending: WO.pending, log: WO.log.slice(0, 50), gaming: gamingNow() };
+}
+function planFrom(a) {
+  const radios = a.radios.filter(r => r.enabled && ['fort', 'ameliorable'].includes(r.analysis.verdict))
+    .map(r => ({ id: r.id, primary: r.analysis.best.primary, secondary: r.analysis.best.secondary, width: r.analysis.best.width }));
+  const global = {}; for (const x of a.advice) if (!x.info) global[x.key] = x.value;
+  return { radios, global };
+}
+// Vérifie une demande de changement contre ce que la box permet vraiment
+function checkPlan(plan, a) {
+  const out = { radios: [], global: {} };
+  for (const x of plan.radios || []) {
+    const r = a.radios.find(y => y.id === +x.id); if (!r) throw new Error('Bande inconnue');
+    if (x.enabled === false || x.enabled === true) { out.radios.push({ id: r.id, enabled: x.enabled }); continue; }
+    const w = +x.width || r.config.width;
+    if (+x.primary === 0) { if (!r.allowed.some(c => c.width === w)) throw new Error(`Largeur ${w} MHz impossible sur ${r.label}`); out.radios.push({ id: r.id, primary: 0, secondary: 0, width: w }); continue; }
+    const c = r.allowed.find(c => c.primary === +x.primary && c.width === w);
+    if (!c) throw new Error(`Canal ${x.primary} en ${w} MHz impossible sur ${r.label}`);
+    out.radios.push({ id: r.id, primary: c.primary, secondary: c.secondary, width: c.width });
+  }
+  for (const k of ['powerSaving', 'wps']) if (typeof plan.global?.[k] === 'boolean') out.global[k] = plan.global[k];
+  return out;
+}
+async function applyPlan(plan, source) {
+  const a = await wifiAnalyse();
+  const done = [];
+  for (const x of plan.radios) {
+    const r = a.radios.find(y => y.id === x.id);
+    await box.wifiSetRadio(x.id, x);
+    WO.last[x.id] = Date.now();
+    done.push(x.enabled !== undefined ? `${r.label} ${x.enabled ? 'allumée' : 'coupée'}` : fmtRadio(r, x));
+  }
+  if (Object.keys(plan.global).length) {
+    await box.wifiSetGlobal(plan.global);
+    if ('powerSaving' in plan.global) done.push(`Économie d'énergie ${plan.global.powerSaving ? 'activée' : 'coupée'}`);
+    if ('wps' in plan.global) done.push(`WPS ${plan.global.wps ? 'activé' : 'désactivé'}`);
+  }
+  if (done.length) { WO.log.unshift({ t: Date.now(), source, changes: done }); WO.log = WO.log.slice(0, 200); }
+  if (plan.radios.length) WO.pending = null; woSave();
+  log(`Wi‑Fi (${source}) : ${done.join(' ; ') || 'rien à changer'}`);
+  broadcast('wifiopt', { log: WO.log.slice(0, 50), pending: null });
+  return done;
+}
+// Attente de la fin de partie, puis optimisation automatique (si activée) quand la maison est calme
+let woQuiet = 0;
+setInterval(async () => {
+  if (!box || !F('wifiOpt') || !devCache.length) return;
+  woQuiet = gamingNow().length ? 0 : woQuiet + 1;
+  if (WO.pending && woQuiet >= 4) { try { await applyPlan(WO.pending.plan, WO.pending.source + ' (après la partie)'); } catch (e) { log('Wi‑Fi : ' + e.message); WO.pending = null; woSave(); } }
+}, 30000);
+setInterval(async () => {
+  if (!WO.auto || !box || !F('wifiOpt') || gamingNow().length || woQuiet < 4) return;
+  const traffic = devCache.reduce((t, d) => t + (d.down || 0) + (d.up || 0), 0);
+  if (traffic > 3000) return; // quelqu'un utilise le réseau : on attend un moment calme
+  try {
+    const a = await wifiAnalyse();
+    const radios = a.radios.filter(r => r.enabled && r.analysis.verdict === 'fort' && (!r.analysis.best.dfs || r.analysis.current.dfs) && Date.now() - (WO.last[r.id] || 0) > 6 * 3600e3)
+      .map(r => ({ id: r.id, primary: r.analysis.best.primary, secondary: r.analysis.best.secondary, width: r.analysis.best.width }));
+    if (radios.length) await applyPlan({ radios, global: {} }, 'automatique');
+  } catch (e) { log('Wi‑Fi auto : ' + e.message); }
+}, 20 * 60e3);
 
 async function getOverview() { if (!box) throw Object.assign(new Error('Box non configurée'), { code: 'no_box' }); return box.overview(); }
 // ---------------------------------------------------------------- Wi-Fi de l'ordinateur
@@ -966,6 +1041,38 @@ async function handler(req, res, opts = {}) {
       if (d && (d.isSelf || d.ip === agentIp || /r[ée]p[ée]teur/i.test(d.name))) return send(res, 400, { error: 'Cet appareil est protégé (répéteur, agent DNS ou ordinateur qui fait tourner Sonde).' });
       await box.block(mac, !!b.block, b.name);
       return send(res, 200, { ok: true });
+    }
+    // ---- optimisation du Wi-Fi
+    if (p === '/api/wifi/opt') {
+      try { return send(res, 200, await wifiAnalyse()); } catch (e) { return send(res, e.code === 'unsupported' ? 200 : 502, { error: e.message, unsupported: e.code === 'unsupported' }); }
+    }
+    if (p === '/api/wifi/auto' && req.method === 'POST') { const b = await body(req); WO.auto = !!b.on; woSave(); return send(res, 200, { auto: WO.auto }); }
+    if (p === '/api/wifi/cancel' && req.method === 'POST') { WO.pending = null; woSave(); broadcast('wifiopt', { pending: null }); return send(res, 200, { ok: true }); }
+    if ((p === '/api/wifi/apply' || p === '/api/wifi/optimize' || p === '/api/wifi/scan') && req.method === 'POST') {
+      const b = await body(req);
+      let a; try { a = await wifiAnalyse(); } catch (e) { return send(res, 400, { error: e.message }); }
+      const g = gamingNow();
+      if (p === '/api/wifi/scan') {
+        const r = a.radios.find(x => x.id === +b.id); if (!r) return send(res, 400, { error: 'Bande inconnue' });
+        if (g.length && !b.force) return send(res, 409, { gaming: g, error: `${g.join(', ')} en jeu : la recherche des voisins peut faire décrocher le Wi‑Fi une seconde.` });
+        try { await box.wifiScan(r.id); } catch (e) { return send(res, 502, { error: e.message }); }
+        return send(res, 200, { ok: true });
+      }
+      let plan; try { plan = p === '/api/wifi/optimize' ? planFrom(a) : checkPlan(b, a); } catch (e) { return send(res, 400, { error: e.message }); }
+      if (!plan.radios.length && !Object.keys(plan.global).length) return send(res, 200, { ok: true, changes: [], note: 'Rien à changer : ton Wi‑Fi est déjà au mieux.' });
+      const source = p === '/api/wifi/optimize' ? 'en un clic' : 'manuel';
+      if (g.length && plan.radios.length) {
+        if (b.later) {
+          // les réglages généraux (WPS, économie d'énergie) ne coupent pas le Wi‑Fi : appliqués tout de suite
+          let now = [];
+          if (Object.keys(plan.global).length) { try { now = await applyPlan({ radios: [], global: plan.global }, source); } catch (e) { return send(res, 502, { error: e.message }); } }
+          WO.pending = { plan: { radios: plan.radios, global: {} }, source, t: Date.now(), wait: g }; woSave(); broadcast('wifiopt', { pending: WO.pending });
+          return send(res, 200, { ok: true, pending: true, changes: now });
+        }
+        return send(res, 409, { gaming: g, error: `${g.join(', ')} en jeu : changer de canal coupe le Wi‑Fi quelques secondes.` });
+      }
+      try { return send(res, 200, { ok: true, changes: await applyPlan(plan, source) }); }
+      catch (e) { return send(res, 502, { error: /insufficient_rights|denied/i.test(e.code || e.message) ? 'La box refuse : autorise NetBench à modifier les réglages (Freebox OS → Paramètres → Gestion des accès → Applications → NetBench → « Modification des réglages de la Freebox »).' : e.message }); }
     }
     if (p === '/api/settings') {
       if (req.method === 'POST') { const b = await body(req); if (typeof b.autoName === 'boolean') settings.autoName = b.autoName; fs.writeFileSync(SET_FILE, JSON.stringify(settings)); }
